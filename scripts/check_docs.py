@@ -32,8 +32,22 @@ SECTIONS = [
 ]
 
 PLACEHOLDER = re.compile(r"\b(TODO|TBD)\b")
-MERMAID = re.compile(r"^```mermaid\n(.*?)^```", re.S | re.M)
-LINK = re.compile(r"\]\(([^)\s]+)\)")
+MERMAID = re.compile(r"^([ \t]*)```mermaid[ \t]*\n(.*?)^\1```[ \t]*$", re.S | re.M)
+LINK = re.compile(r"\]\((<[^>]+>|[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+
+
+def mermaid_blocks(text: str) -> list[str]:
+    """Bloki ```mermaid, także z wcięciem (w liście) i spacjami po nazwie języka."""
+    blocks = []
+    for indent, body in MERMAID.findall(text):
+        lines = body.splitlines()
+        blocks.append("\n".join(ln[len(indent) :] if ln.startswith(indent) else ln for ln in lines))
+    return blocks
+
+
+def links(text: str) -> list[str]:
+    """Cele linków Markdown poza diagramami; `<…>` i tytuły w cudzysłowie są obsługiwane."""
+    return [t[1:-1] if t.startswith("<") else t for t in LINK.findall(MERMAID.sub("", text))]
 
 
 def documents() -> list[Path]:
@@ -54,8 +68,7 @@ def check_sections() -> list[str]:
 def check_links() -> list[str]:
     errors = []
     for path in documents():
-        text = MERMAID.sub("", path.read_text(encoding="utf-8"))
-        for target in LINK.findall(text):
+        for target in links(path.read_text(encoding="utf-8")):
             if re.match(r"^[a-z]+:", target) or target.startswith("#"):
                 continue
             file_part = target.split("#", 1)[0]
@@ -69,7 +82,7 @@ def check_mermaid() -> list[str]:
     blocks = [
         (path, i, block)
         for path in documents()
-        for i, block in enumerate(MERMAID.findall(path.read_text(encoding="utf-8")), 1)
+        for i, block in enumerate(mermaid_blocks(path.read_text(encoding="utf-8")), 1)
     ]
     with tempfile.TemporaryDirectory() as tmp:
         for path, i, block in blocks:

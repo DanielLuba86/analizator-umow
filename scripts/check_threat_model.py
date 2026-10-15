@@ -21,9 +21,10 @@ DOC = ROOT / "docs" / "threat-model.md"
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 
 ROW = re.compile(r"^\|\s*(T\d+)\s*\|")
-BACKEND = re.compile(r"`(tests/[\w/]+\.py::\w+)`")
-FRONTEND = re.compile(r"`frontend/tests/([\w.]+)::([^`]+)`")
-CI_JOB = re.compile(r"`ci:([\w-]+)`")
+CODE = re.compile(r"`([^`]+)`")
+BACKEND = re.compile(r"tests/[\w/]+\.py(::\w+)+")
+FRONTEND = re.compile(r"frontend/tests/([\w.]+)::(.+)")
+CI_JOB = re.compile(r"ci:([\w-]+)")
 
 
 def collected_backend_tests() -> set[str]:
@@ -51,6 +52,34 @@ def ci_jobs() -> set[str]:
     return jobs
 
 
+def row_errors(line: str, backend: set[str], jobs: set[str]) -> list[str]:
+    """Błędy jednego wiersza tabeli; każde odwołanie musi mieć poprawną postać i istnieć."""
+    errors = []
+    refs = 0
+    for code in CODE.findall(line):
+        if code.startswith("tests/"):
+            refs += 1
+            if not BACKEND.fullmatch(code):
+                errors.append(f"niepoprawne odwołanie {code}")
+            elif code not in backend:
+                errors.append(f"brak testu {code}")
+        elif code.startswith("frontend/tests/"):
+            refs += 1
+            m = FRONTEND.fullmatch(code)
+            path = ROOT / "frontend" / "tests" / m.group(1) if m else None
+            body = path.read_text(encoding="utf-8") if path and path.exists() else ""
+            if not m or f'test("{m.group(2)}"' not in body:
+                errors.append(f"brak testu {code}")
+        elif code.startswith("ci:"):
+            refs += 1
+            m = CI_JOB.fullmatch(code)
+            if not m or m.group(1) not in jobs:
+                errors.append(f"brak joba CI {code}")
+    if refs == 0:
+        errors.append("zagrożenie bez testu")
+    return errors
+
+
 def main() -> int:
     if not DOC.exists():
         print(f"brak pliku {DOC.relative_to(ROOT)}")
@@ -67,23 +96,7 @@ def main() -> int:
         if not m:
             continue
         rows += 1
-        refs = 0
-        for ref in BACKEND.findall(line):
-            refs += 1
-            if ref not in backend:
-                errors.append(f"{m.group(1)} (linia {n}): brak testu {ref}")
-        for file, name in FRONTEND.findall(line):
-            refs += 1
-            path = ROOT / "frontend" / "tests" / file
-            body = path.read_text(encoding="utf-8") if path.exists() else ""
-            if f'test("{name}"' not in body:
-                errors.append(f"{m.group(1)} (linia {n}): brak testu frontend/tests/{file}::{name}")
-        for job in CI_JOB.findall(line):
-            refs += 1
-            if job not in jobs:
-                errors.append(f"{m.group(1)} (linia {n}): brak joba CI {job}")
-        if refs == 0:
-            errors.append(f"{m.group(1)} (linia {n}): zagrożenie bez testu")
+        errors += [f"{m.group(1)} (linia {n}): {e}" for e in row_errors(line, backend, jobs)]
     if rows == 0:
         errors.append("tabela zagrożeń jest pusta")
     for e in errors:

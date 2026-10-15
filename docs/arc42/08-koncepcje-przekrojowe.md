@@ -10,7 +10,7 @@ musi być doskonała. Szczegółowe zagrożenia, obrony i testy są w
 |---|---|---|
 | 1. Detekcja przed agentem | Heurystyki: frazy rozkazowe do AI, zero-width i bidi, homoglify, pseudo-znaczniki, bloki base64. Do tego klasyfikator Claude bez narzędzi, z odpowiedzią w schemacie JSON. Każde trafienie ma zweryfikowany cytat. | [`domain/injection.py`](../../backend/app/domain/injection.py), [`agent/classifier.py`](../../backend/app/agent/classifier.py) |
 | 2. Spotlighting | Treść tylko przez `read_fragment`, w `<untrusted_contract_fragment>`; znaczniki z treści neutralizowane; prompt deklaruje zawartość jako dane i nie zawiera treści umowy. | [`agent/tools.py`](../../backend/app/agent/tools.py), [`agent/prompt.py`](../../backend/app/agent/prompt.py) |
-| 3. Najmniejsze uprawnienia | Wbudowane narzędzia SDK wyłączone; tylko 5 własnych narzędzi; zestaw narzędzi sprawdzany przy starcie (fail closed); `analysis_id`/`version_id` z kontekstu serwera; proces agenta bez sekretów serwera. | [`agent/sdk_runner.py`](../../backend/app/agent/sdk_runner.py), [`agent/context.py`](../../backend/app/agent/context.py) |
+| 3. Najmniejsze uprawnienia | Wbudowane narzędzia SDK wyłączone; tylko 5 własnych narzędzi; zestaw narzędzi sprawdzany przy starcie (fail closed); `analysis_id`/`version_id` z kontekstu serwera; zmienne środowiskowe z sekretami serwera (wg wzorców nazw) wyczyszczone w procesie agenta. | [`agent/sdk_runner.py`](../../backend/app/agent/sdk_runner.py), [`agent/context.py`](../../backend/app/agent/context.py) |
 | 4. Weryfikacja cytatów | Teza przyjęta tylko z dosłownym cytatem (po normalizacji białych znaków, min. 12 znaków) we wskazanym fragmencie. | [`domain/quotes.py`](../../backend/app/domain/quotes.py) |
 | 5. Człowiek w pętli | Opinia, wzorzec, eksport i zwolnienie z kwarantanny tylko jako wnioski zatwierdzane przez prawnika. | [`services/actions.py`](../../backend/app/services/actions.py) |
 | 6. Limity | `AGENT_MAX_TURNS=30`, `AGENT_MAX_BUDGET_USD=0.50`, `AGENT_MAX_FINDINGS=60`, `AGENT_TIMEOUT_S=300` → `budget_exceeded` z tezami oznaczonymi jako niepełne. | [`agent/guard.py`](../../backend/app/agent/guard.py) |
@@ -18,8 +18,9 @@ musi być doskonała. Szczegółowe zagrożenia, obrony i testy są w
 
 ## Uwierzytelnianie i autoryzacja
 
-- Hasła są hashowane argon2. Odpowiedź dla nieznanego loginu i złego hasła jest taka sama,
-  a czas weryfikacji wyrównany.
+- Hasła są hashowane argon2. Odpowiedź dla nieznanego loginu i złego hasła jest taka sama.
+  Przy nieznanym loginie serwer weryfikuje atrapę hasha, żeby ścieżka kodu była ta sama; czasu nie
+  mierzą testy.
 - Sesja jest przechowywana po stronie serwera, w bazie tylko jako hash SHA-256 tokenu.
   W przeglądarce token leży w ciasteczku `sid` (`HttpOnly`, `SameSite=Strict`, `Path=/api`,
   `Secure` z ustawień).
@@ -55,7 +56,7 @@ musi być doskonała. Szczegółowe zagrożenia, obrony i testy są w
   - start analizy: `FOR UPDATE` na wersji;
   - decyzja: `FOR UPDATE` na wniosku;
   - idempotentne wnioski: częściowy unikalny indeks.
-- Dziennik audytu jest tylko dopisywany.
+- Dziennik audytu jest tylko dopisywany: aplikacja nie ma operacji zmiany ani usuwania wpisów. To konwencja kodu, nie wymuszają jej uprawnienia ani wyzwalacze w bazie.
 
 ## Testowanie
 

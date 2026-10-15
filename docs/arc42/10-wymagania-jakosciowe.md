@@ -35,4 +35,4 @@ flowchart LR
 | T1 | Uruchomienie CI na pull requeście | Wszystkie testy przechodzą bez klucza API | CI bez `ANTHROPIC_API_KEY` |
 | P1 | Dwóch prawników zatwierdza ten sam wniosek równocześnie | Jeden skutek, jeden wpis audytu, drugi dostaje 409 | test wyścigu na dwóch połączeniach |
 | U1 | Nowy członek zespołu klonuje repozytorium | Aplikacja działa po krokach z README | `docker compose up` + migracje + seed, logowanie kontem demo |
-| U2 | Błąd serwera podczas pracy w przeglądarce | Komunikat z tytułem i `request_id` do zgłoszenia | każdy błąd API w UI zawiera `request_id` |
+| U2 | Błąd serwera podczas pracy w przeglądarce | Komunikat z tytułem i `request_id` do zgłoszenia | każdy błąd zwrócony przez API jest pokazany w UI z `request_id` (błąd sieci — komunikat ogólny) |
