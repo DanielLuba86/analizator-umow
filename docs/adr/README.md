@@ -8,6 +8,7 @@ Krótkie zapisy decyzji architektonicznych w formacie MADR. Każdy ADR mieści s
 |---|---|---|---|
 | [0001](0001-python-fastapi-i-react.md) | Backend w Pythonie (FastAPI) i frontend w React | Przyjęta | 2026-10-15 |
 | [0006](0006-postgresql-w-docker-compose.md) | PostgreSQL w docker-compose | Przyjęta | 2026-10-15 |
+| [0008](0008-sesje-httponly-i-dwie-role.md) | Sesje po stronie serwera (HttpOnly) i dwie role | Przyjęta | 2026-10-15 |
 
 ## Szablon MADR
 
