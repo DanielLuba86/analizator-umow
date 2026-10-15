@@ -6,12 +6,13 @@ przez ten sam weryfikator cytatów co tezy agenta (`verify_quote`).
 
 import re
 import unicodedata
+from bisect import bisect_left, bisect_right
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
 from app.domain.fragments import Fragment
-from app.domain.quotes import QuoteNotFound, _is_space, _normalize, verify_quote
+from app.domain.quotes import MIN_QUOTE_LEN, normalize_whitespace
 
 InjectionRule = Literal[
     "fraza_rozkazowa", "zero_width", "bidi", "homoglif", "pseudo_znacznik", "base64"
@@ -27,11 +28,12 @@ class InjectionHit:
     end: int
 
 
-MIN_QUOTE_LEN = 12
+MAX_EXPAND_LEN = 200
 _FLAGS = re.IGNORECASE | re.UNICODE
 
 _COMMAND_PHRASES = re.compile(
-    "|".join(
+    r"\b(?:"
+    + "|".join(
         [
             r"zignoruj\s+(?:wszystkie\s+)?(?:poprzednie|wcześniejsze)\s+(?:instrukcje|polecenia)",
             r"ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions",
@@ -40,13 +42,14 @@ _COMMAND_PHRASES = re.compile(
             r"(?:bezpieczną|niskiego\s+ryzyka)",
             r"nie\s+(?:zgłaszaj|raportuj|oznaczaj)",
             r"system\s+prompt",
-            r"you\s+are\s+now",
+            r"(?<!\bif )you\s+are\s+now\b",
         ]
-    ),
+    )
+    + r")\b",
     _FLAGS,
 )
-_ZERO_WIDTH = re.compile("[​‌‍⁠﻿]+")
-_BIDI = re.compile("[‪-‮⁦-⁩]+")
+_ZERO_WIDTH = re.compile(r"[\u00ad\u200b\u200c\u200d\u2060\ufeff]+")
+_BIDI = re.compile(r"[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]+")
 _PSEUDO_TAG = re.compile(
     r"</?\s*(?:system|assistant|user|document|instructions?|untrusted_contract_fragment)\b[^>]*>",
     _FLAGS,
@@ -98,57 +101,72 @@ def _raw_spans(text: str) -> Iterator[tuple[InjectionRule, int, int]]:
         yield "base64", m.start(), m.end()
 
 
-def _trim(text: str, start: int, end: int) -> tuple[int, int]:
-    while start < end and _is_space(text[start]):
-        start += 1
-    while end > start and _is_space(text[end - 1]):
-        end -= 1
-    return start, end
+@dataclass(frozen=True)
+class _Normalized:
+    """Fragment znormalizowany raz: tekst oraz przesunięcia w oryginale."""
+
+    text: str
+    starts: list[int]
+    ends: list[int]
 
 
-def _is_verified(text: str, fragment: Fragment, start: int, end: int) -> bool:
-    """Czy verify_quote zwróci dokładnie [start, end) (pierwsze wystąpienie w fragmencie)."""
-    try:
-        m = verify_quote(text, [fragment], fragment.id, text[start:end])
-    except QuoteNotFound:
-        return False
-    return (m.start, m.end) == (start, end)
+def _expand(frag: Fragment, norm: _Normalized, raw_start: int, raw_end: int) -> tuple[int, int]:
+    """Rozszerza trafienie w obrębie fragmentu do cytatu akceptowanego przez verify_quote.
 
-
-def _expand(text: str, fragment: Fragment, start: int, end: int) -> tuple[int, int]:
-    """Rozszerza zakres w obrębie fragmentu do cytatu akceptowanego przez verify_quote.
-
-    Rozszerza naprzemiennie w lewo i w prawo; zakres nie zaczyna się ani nie kończy
-    na białym znaku. Gdy fragment jest za krótki, zwraca cały fragment bez białych znaków
-    na brzegach (verify_quote odrzuci taki cytat jako za krótki).
+    Pracuje na znormalizowanym fragmencie (policzonym raz). Rozszerza naprzemiennie w lewo
+    i w prawo do >= MIN_QUOTE_LEN znaków, nie więcej niż MAX_EXPAND_LEN. Gdy okno nie jest
+    jednoznaczne, zwraca pierwsze wystąpienie tego samego tekstu (tak jak verify_quote).
+    Zbyt krótki fragment: cały fragment bez białych znaków na brzegach.
     """
-    start, end = max(start, fragment.start), min(end, fragment.end)
+    hay, starts, ends = norm.text, norm.starts, norm.ends
+    if not hay:
+        return raw_start, raw_end
+    a = max(bisect_right(starts, max(raw_start, frag.start) - frag.start) - 1, 0)
+    b = min(bisect_left(ends, min(raw_end, frag.end) - frag.start) + 1, len(hay))
+    b = max(b, a + 1)
     go_left = True
     while True:
-        s, e = _trim(text, start, end)
-        if (
-            s < e
-            and len(_normalize(text[s:e])[0]) >= MIN_QUOTE_LEN
-            and (_is_verified(text, fragment, s, e))
-        ):
-            return s, e
-        can_left, can_right = start > fragment.start, end < fragment.end
+        ta, tb = a, b
+        while ta < tb and hay[ta] == " ":
+            ta += 1
+        while tb > ta and hay[tb - 1] == " ":
+            tb -= 1
+        size = tb - ta
+        if size >= MIN_QUOTE_LEN:
+            pos = hay.find(hay[ta:tb])
+            if pos == ta or size >= MAX_EXPAND_LEN:
+                ta, tb = pos, pos + size
+                break
+        can_left, can_right = a > 0, b < len(hay)
         if not (can_left or can_right):
-            return _trim(text, fragment.start, fragment.end) if e - s < MIN_QUOTE_LEN else (s, e)
+            if size < MIN_QUOTE_LEN:  # cały fragment, bez białych znaków na brzegach
+                ta, tb = 0, len(hay)
+                while ta < tb and hay[ta] == " ":
+                    ta += 1
+                while tb > ta and hay[tb - 1] == " ":
+                    tb -= 1
+            break
         if (go_left and can_left) or not can_right:
-            start -= 1
+            a -= 1
         else:
-            end += 1
+            b += 1
         go_left = not go_left
+    a, b = ta, tb
+    return frag.start + starts[a], frag.start + ends[b - 1]
 
 
 def scan_heuristics(text: str, fragments: Sequence[Fragment]) -> list[InjectionHit]:
     """Zwraca trafienia heurystyk posortowane po początku, potem po nazwie reguły."""
     hits: list[InjectionHit] = []
+    cache: dict[str, _Normalized] = {}
     for rule, raw_start, raw_end in _raw_spans(text):
         fragment = next((f for f in fragments if f.start <= raw_start < f.end), None)
         if fragment is None:
             continue
-        start, end = _expand(text, fragment, raw_start, raw_end)
+        norm = cache.get(fragment.id)
+        if norm is None:
+            t, st, en = normalize_whitespace(text[fragment.start : fragment.end])
+            norm = cache[fragment.id] = _Normalized(t, st, en)
+        start, end = _expand(fragment, norm, raw_start, raw_end)
         hits.append(InjectionHit(rule, fragment.id, text[start:end], start, end))
     return sorted(hits, key=lambda h: (h.start, h.rule))

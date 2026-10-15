@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import pytest
@@ -158,3 +159,49 @@ def test_very_short_fragment_still_emits_hit_with_whole_trimmed_fragment() -> No
     assert len(hits) == 1
     h = hits[0]
     assert h.quote == h.quote.strip() and "A​B" in h.quote
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Zwykłe zdanie bez ryzyka, nie zgłaszając sprzeciwu Najemca akceptuje zmianę.",
+        "Postanowienia nie oznaczają zrzeczenia się roszczeń przez żadną ze Stron.",
+        "Wynajmujący nie raportujemy tego w żadnym dokumencie rozliczeniowym.",
+        "If you are now in breach of this Agreement, notice shall be given.",
+    ],
+)
+def test_phrase_word_boundaries_avoid_false_positives(text: str) -> None:
+    doc = f"§ 1. X\n\n1. {text}\n"
+    assert "fraza_rozkazowa" not in rules(doc)
+
+
+@pytest.mark.parametrize(
+    "char,rule",
+    [
+        ("­", "zero_width"),
+        ("‎", "bidi"),
+        ("‏", "bidi"),
+        ("؜", "bidi"),
+    ],
+)
+def test_widened_invisible_characters_detected(char: str, rule: str) -> None:
+    doc = f"§ 1. X\n\n1. Zwykły tekst um{char}owy i jego dalszy ciąg w ustępie.\n"
+    assert rule in rules(doc)
+
+
+@pytest.mark.parametrize(
+    "unit",
+    ["pаs ", "a​ "],
+    ids=["homoglif", "zero_width"],
+)
+def test_repeated_hits_scan_fast_and_verify(unit: str) -> None:
+    text = "§ 1. X\n\n1. " + unit * 300 + "\n"
+    frs = split_into_fragments(text)
+    t0 = time.perf_counter()
+    hits = scan_heuristics(text, frs)
+    elapsed = time.perf_counter() - t0
+    assert elapsed < 1.0, elapsed
+    assert len(hits) >= 300
+    for h in hits:
+        m = verify_quote(text, frs, h.fragment_id, h.quote)
+        assert (m.start, m.end) == (h.start, h.end)
