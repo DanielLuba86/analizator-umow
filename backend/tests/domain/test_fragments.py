@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from app.domain.fragments import Fragment, fragment_text, split_into_fragments
@@ -72,10 +73,40 @@ def test_leading_whitespace_belongs_to_first_fragment() -> None:
 
 
 def test_indented_subitems_are_not_new_ustepy() -> None:
-    text = "## § 2. Tytuł\n\n1. Punkt.\n    1. podpunkt\n    2. podpunkt\n2. Drugi.\n"
+    text = "## § 2. Tytuł\n\n1. Punkt.\n   1. podpunkt trzy\n    2. podpunkt cztery\n2. Drugi.\n"
     frs = split_into_fragments(text)
     assert [f.label for f in frs] == ["§ 2 ust. 1", "§ 2 ust. 2"]
-    assert "podpunkt" in fragment_text(text, frs[0])
+    body = fragment_text(text, frs[0])
+    assert "podpunkt trzy" in body and "podpunkt cztery" in body
+
+
+def test_labels_unique_per_file(umowy_dir: Path) -> None:
+    for path in sorted(umowy_dir.glob("*.md")):
+        labels = [f.label for f in split_into_fragments(path.read_text(encoding="utf-8"))]
+        assert len(labels) == len(set(labels)), path.name
+
+
+def test_ust_numbers_sequential_per_paragraph(umowy_dir: Path) -> None:
+    for path in sorted(umowy_dir.glob("*.md")):
+        per_par: dict[str, list[str]] = {}
+        for f in split_into_fragments(path.read_text(encoding="utf-8")):
+            m = re.fullmatch(r"(§ \d+) ust\. (\d+)", f.label)
+            if m:
+                per_par.setdefault(m.group(1), []).append(m.group(2))
+        for par, nums in per_par.items():
+            assert nums == [str(k) for k in range(1, len(nums) + 1)], (path.name, par)
+
+
+def test_restarted_list_continues_numbering() -> None:
+    text = "## § 1. A\n1. a\n2. b\n\nTekst.\n\n1. c\n"
+    labels = [f.label for f in split_into_fragments(text)]
+    assert labels == ["§ 1 ust. 1", "§ 1 ust. 2", "§ 1 ust. 3"]
+
+
+def test_label_collisions_get_suffix() -> None:
+    text = "## § 1. A\nTreść.\n\n## Uwagi\nx\n\n## Uwagi\ny\n"
+    labels = [f.label for f in split_into_fragments(text)]
+    assert labels == ["§ 1", "Uwagi", "Uwagi (2)"]
 
 
 def test_section_without_list_is_single_fragment_and_rule_is_text() -> None:

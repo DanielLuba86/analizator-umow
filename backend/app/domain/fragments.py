@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 _PARAGRAPH_HEADING = re.compile(r"^(?:#{1,3}\s*§\s*(\d+)|§\s*(\d+)\.)")
 _OTHER_HEADING = re.compile(r"^#{1,3}\s+(.+)")
-_LIST_ITEM = re.compile(r"^ {0,3}(\d+)\.\s")
+_LIST_ITEM = re.compile(r"^\d+\.\s")
 
 
 @dataclass(frozen=True)
@@ -32,10 +32,13 @@ def _build(text: str, boundaries: list[tuple[int, str]]) -> list[Fragment]:
         return []
     starts = [0] + [start for start, _ in boundaries[1:]]
     ends = [*starts[1:], len(text)]
-    return [
-        Fragment(id=f"f{i:03d}", label=boundaries[i - 1][1], start=starts[i - 1], end=ends[i - 1])
-        for i in range(1, len(boundaries) + 1)
-    ]
+    seen: dict[str, int] = {}
+    fragments: list[Fragment] = []
+    for i, (_, label) in enumerate(boundaries):
+        seen[label] = seen.get(label, 0) + 1
+        unique = label if seen[label] == 1 else f"{label} ({seen[label]})"
+        fragments.append(Fragment(id=f"f{i + 1:03d}", label=unique, start=starts[i], end=ends[i]))
+    return fragments
 
 
 def _split_akapity(text: str) -> list[tuple[int, str]]:
@@ -58,25 +61,25 @@ def _split_paragraphs(text: str, lines: list[tuple[int, str]]) -> list[tuple[int
         boundaries.append((0, "Komparycja"))
 
     section: str | None = None  # numer bieżącego §, None poza sekcją §
-    has_items = False
+    ust = 0
     for offset, line in lines[first:]:
         number = _paragraph_number(line)
         other = _OTHER_HEADING.match(line)
-        item = _LIST_ITEM.match(line)
+        item = _LIST_ITEM.match(line)  # tylko od kolumny 0; wcięte linie to część punktu
         if number is not None:
-            section, has_items = number, False
+            section, ust = number, 0
             boundaries.append((offset, f"§ {number}"))
         elif other is not None:
             section = None
             boundaries.append((offset, other.group(1).strip()))
         elif item is not None and section is not None:
-            label = f"§ {section} ust. {item.group(1)}"
-            if has_items:
+            ust += 1
+            label = f"§ {section} ust. {ust}"
+            if ust > 1:
                 boundaries.append((offset, label))
             else:
                 # nagłówek i tekst przed punktem 1 należą do pierwszego ustępu
                 boundaries[-1] = (boundaries[-1][0], label)
-                has_items = True
     return boundaries
 
 
