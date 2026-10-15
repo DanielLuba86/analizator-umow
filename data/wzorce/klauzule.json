@@ -1,0 +1,62 @@
+[
+  {
+    "kind": "najem",
+    "nazwa_klauzuli": "Kara umowna",
+    "tresc": "W razie opóźnienia Najemcy w zapłacie czynszu o więcej niż 14 dni Wynajmujący może naliczyć karę umowną w wysokości 0,1% zaległej kwoty za każdy dzień opóźnienia, nie więcej niż 10% rocznego czynszu. Kara umowna nie wyłącza dochodzenia odszkodowania przenoszącego jej wysokość na zasadach ogólnych."
+  },
+  {
+    "kind": "najem",
+    "nazwa_klauzuli": "Wypowiedzenie",
+    "tresc": "Każda ze stron może wypowiedzieć umowę z zachowaniem trzymiesięcznego okresu wypowiedzenia na koniec miesiąca kalendarzowego. Wynajmujący może wypowiedzieć umowę w trybie natychmiastowym, jeżeli Najemca zalega z czynszem za co najmniej dwa pełne okresy płatności mimo pisemnego wezwania do zapłaty w terminie 14 dni."
+  },
+  {
+    "kind": "najem",
+    "nazwa_klauzuli": "Odpowiedzialność",
+    "tresc": "Najemca odpowiada za szkody w lokalu powstałe z jego winy lub z winy osób, którym lokal udostępnił, z wyłączeniem zwykłego zużycia. Wynajmujący odpowiada za wady lokalu uniemożliwiające korzystanie z niego zgodnie z umową, a odpowiedzialność każdej ze stron jest ograniczona do rzeczywiście poniesionej szkody."
+  },
+  {
+    "kind": "najem",
+    "nazwa_klauzuli": "Poufność",
+    "tresc": "Strony zobowiązują się do zachowania w poufności warunków umowy oraz informacji uzyskanych w związku z jej wykonywaniem. Obowiązek nie dotyczy ujawnień wymaganych przepisami prawa oraz informacji przekazywanych doradcom stron związanym tajemnicą zawodową. Obowiązek trwa przez okres umowy i dwa lata po jej zakończeniu."
+  },
+  {
+    "kind": "dostawa",
+    "nazwa_klauzuli": "Kara umowna",
+    "tresc": "W razie opóźnienia w dostawie Dostawca zapłaci karę umowną w wysokości 0,5% wartości opóźnionej partii towaru za każdy rozpoczęty dzień opóźnienia, nie więcej niż 10% wartości tej partii. Odbiorca może dochodzić odszkodowania uzupełniającego do wysokości poniesionej szkody."
+  },
+  {
+    "kind": "dostawa",
+    "nazwa_klauzuli": "Wypowiedzenie",
+    "tresc": "Umowa zawarta na czas nieoznaczony może być wypowiedziana przez każdą ze stron z zachowaniem dwumiesięcznego okresu wypowiedzenia. Każda ze stron może rozwiązać umowę ze skutkiem natychmiastowym w razie istotnego naruszenia jej postanowień, którego druga strona nie usunęła w terminie 14 dni od pisemnego wezwania."
+  },
+  {
+    "kind": "dostawa",
+    "nazwa_klauzuli": "Odpowiedzialność",
+    "tresc": "Dostawca odpowiada za wady towaru na zasadach rękojmi przez okres 24 miesięcy od dostawy. Odpowiedzialność każdej ze stron z tytułu umowy jest ograniczona do wartości netto zamówienia, którego dotyczy szkoda, z wyjątkiem szkód wyrządzonych umyślnie."
+  },
+  {
+    "kind": "dostawa",
+    "nazwa_klauzuli": "Poufność",
+    "tresc": "Każda ze stron zachowa w poufności informacje handlowe i techniczne otrzymane od drugiej strony i wykorzysta je wyłącznie w celu wykonania umowy. Obowiązek nie dotyczy informacji publicznie dostępnych ani ujawnianych na żądanie uprawnionych organów. Obowiązek trwa przez okres umowy i trzy lata po jej zakończeniu."
+  },
+  {
+    "kind": "zlecenie",
+    "nazwa_klauzuli": "Kara umowna",
+    "tresc": "Za niedotrzymanie uzgodnionego terminu wykonania zlecenia z przyczyn leżących po stronie Zleceniobiorcy Zleceniodawca może naliczyć karę umowną w wysokości 1% wynagrodzenia za każdy dzień zwłoki, nie więcej niż 15% wynagrodzenia. Kara nie jest należna, jeżeli opóźnienie wynikło z braku współdziałania Zleceniodawcy."
+  },
+  {
+    "kind": "zlecenie",
+    "nazwa_klauzuli": "Wypowiedzenie",
+    "tresc": "Każda ze stron może wypowiedzieć umowę w każdym czasie z zachowaniem czternastodniowego okresu wypowiedzenia. W razie wypowiedzenia Zleceniobiorcy należy się wynagrodzenie proporcjonalne do zakresu prac wykonanych do dnia ustania umowy."
+  },
+  {
+    "kind": "zlecenie",
+    "nazwa_klauzuli": "Odpowiedzialność",
+    "tresc": "Zleceniobiorca wykonuje zlecenie z należytą starannością wynikającą z zawodowego charakteru działalności. Jego odpowiedzialność odszkodowawcza jest ograniczona do wysokości wynagrodzenia otrzymanego za zlecenie, z wyjątkiem szkód wyrządzonych umyślnie lub wskutek rażącego niedbalstwa."
+  },
+  {
+    "kind": "zlecenie",
+    "nazwa_klauzuli": "Poufność",
+    "tresc": "Zleceniobiorca zobowiązuje się nie ujawniać informacji uzyskanych od Zleceniodawcy w związku z wykonywaniem zlecenia i wykorzystywać je wyłącznie do jego realizacji. Po zakończeniu umowy zwróci lub zniszczy materiały zawierające te informacje. Obowiązek trwa przez okres umowy i dwa lata po jej zakończeniu."
+  }
+]
