@@ -78,10 +78,12 @@ def check_mermaid() -> list[str]:
             cmd = ["npx", "-y", MERMAID_CLI, "-q", "-i", str(src), "-o", str(Path(tmp) / "out.svg")]
             if PUPPETEER_CONFIG.exists():
                 cmd += ["-p", str(PUPPETEER_CONFIG)]
-            run = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            run = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
             if run.returncode != 0:
                 detail = (run.stderr or run.stdout).strip().splitlines()
-                errors.append(f"{path.relative_to(ROOT)}: diagram {i} nie parsuje się: {detail[:3]}")
+                errors.append(
+                    f"{path.relative_to(ROOT)}: diagram {i} nie parsuje się: {detail[:3]}"
+                )
     print(f"diagramów Mermaid: {len(blocks)}")
     return errors
 

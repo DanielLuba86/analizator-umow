@@ -5,7 +5,8 @@ Odwołania w tabeli zagrożeń (w backtickach):
 - `frontend/tests/<plik>::<nazwa testu>` — test Vitest; plik musi zawierać `test("<nazwa testu>"`,
 - `ci:<job>` — job w .github/workflows/ci.yml.
 
-Uruchamiany z katalogu backend/ (tam działa pytest): `uv run python ../scripts/check_threat_model.py`.
+Uruchamiany z katalogu backend/ (tam działa pytest):
+`uv run python ../scripts/check_threat_model.py`.
 Kolekcja testów nie łączy się z bazą, więc DATABASE_URL może być dowolny.
 """
 

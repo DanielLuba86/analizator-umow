@@ -16,6 +16,9 @@ services:
   backend:
     build: backend
     env_file: .env
+    volumes:
+      # wzorce klauzul dla seeda (app/repo/seed.py: DEFAULT_TEMPLATES_PATH → /data/wzorce w obrazie)
+      - ./data/wzorce:/data/wzorce:ro
     depends_on:
       db:
         condition: service_healthy
