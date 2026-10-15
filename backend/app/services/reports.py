@@ -25,12 +25,17 @@ def quarantine_state(s: Session, analysis_id: int) -> QuarantineState | None:
 
 def is_report_visible(s: Session, analysis: Analysis) -> bool:
     """Tezy widać po zakończeniu analizy; w kwarantannie dopiero po zatwierdzeniu wniosku."""
-    if analysis.status in REPORT_VISIBLE_STATUSES:
-        return True
+    q = quarantine_state(s, analysis.id)
+    approved = q is not None and q.status == "zatwierdzona"
     if analysis.status == "quarantined":
-        q = quarantine_state(s, analysis.id)
-        return q is not None and q.status == "zatwierdzona"
-    return False
+        return approved
+    if analysis.status not in REPORT_VISIBLE_STATUSES:
+        return False
+    # obrona w głąb: wniosek kwarantanny lub wykryte wstrzyknięcie bez zatwierdzenia ukrywa raport
+    # niezależnie od statusu (np. failed po błędzie w trakcie analizy)
+    if q is not None and not approved:
+        return False
+    return approved or not any(f.typ == "wstrzyknięcie" for f in list_findings(s, analysis.id))
 
 
 def visible_findings(s: Session, analysis: Analysis) -> list[FindingRow]:

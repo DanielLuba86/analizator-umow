@@ -257,3 +257,22 @@ def test_analysis_endpoints_require_login(anon: TestClient) -> None:
 def _frags(client: TestClient, vid: int) -> list[tuple[str, str]]:
     data: dict[str, Any] = client.get(f"/api/versions/{vid}").json()
     return [(f["label"], data["text"][f["start"] : f["end"]]) for f in data["fragments"]]
+
+
+def test_failed_analysis_with_injection_finding_stays_hidden(
+    client: TestClient, agent: Agent, sf: sessionmaker[Session]
+) -> None:
+    """Obrona w głąb: status failed nie może odsłonić tez analizy z wykrytym wstrzyknięciem."""
+    agent.script = [finding(QUOTE)]
+    aid = start(client, new_version(client, INJECTED))
+    with sf() as s:
+        a = s.get_one(models.Analysis, aid)
+        a.status = "failed"
+        for p in s.scalars(
+            select(models.PendingAction).where(models.PendingAction.analysis_id == aid)
+        ):
+            s.delete(p)
+        s.commit()
+    rep = client.get(f"/api/analyses/{aid}").json()
+    assert rep["status"] == "failed" and rep["findings"] == []
+    assert client.post(f"/api/analyses/{aid}/actions", json={"typ": "eksport"}).status_code == 409
