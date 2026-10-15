@@ -1,11 +1,31 @@
 import json
 import logging
+import logging.config
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
 import structlog
+from uvicorn.config import LOGGING_CONFIG
 
 from app.security.logging import configure_logging, redact_contract_text
+
+
+@pytest.fixture(autouse=True)
+def _restore_logging() -> Iterator[None]:
+    names = ["", "uvicorn", "uvicorn.error", "uvicorn.access", "sqlalchemy"]
+    saved = [
+        (n, list(logging.getLogger(n).handlers), logging.getLogger(n).propagate) for n in names
+    ]
+    level = logging.getLogger().level
+    yield
+    structlog.reset_defaults()
+    for n, handlers, prop in saved:
+        lg = logging.getLogger(n)
+        lg.handlers[:] = handlers
+        lg.propagate = prop
+    logging.getLogger().setLevel(level)
+
 
 LONG = "Zamawiający zapłaci karę umowną. " * 20
 
@@ -93,3 +113,47 @@ def test_configure_logging_idempotent(capsys: pytest.CaptureFixture[str]) -> Non
     assert len(_lines(capsys)) == 1
     structlog.get_logger().info("dwa")
     assert len(_lines(capsys)) == 1
+
+
+def test_uvicorn_loggers_are_redacted(capsys: pytest.CaptureFixture[str]) -> None:
+    logging.config.dictConfig(LOGGING_CONFIG)
+    configure_logging("INFO")
+    capsys.readouterr()
+    try:
+        raise ValueError(LONG)
+    except ValueError:
+        logging.getLogger("uvicorn.error").exception("błąd")
+    logging.getLogger("uvicorn.access").info('%s - "%s %s"', "1.2.3.4", "GET", "/api/x")
+    raw = capsys.readouterr().out
+    assert "karę umowną" not in raw
+    recs = [json.loads(line) for line in raw.splitlines() if line.strip()]
+    assert len(recs) == 2
+    assert recs[0]["exception"].startswith("<redacted len=")
+
+
+def test_depth_cap_fails_closed() -> None:
+    nested: Any = "sekret"
+    for _ in range(12):
+        nested = {"a": nested}
+    out = redact_contract_text(None, "info", {"n": nested})
+    cur: Any = out["n"]
+    while isinstance(cur, dict):
+        cur = cur["a"]
+    assert cur == "<redacted depth>"
+
+
+def test_non_str_values_are_length_checked() -> None:
+    class Big:
+        def __repr__(self) -> str:
+            return "x" * 300
+
+    ev = redact_contract_text(None, "info", {"b": b"y" * 300, "s": {"z" * 300}, "o": Big(), "n": 3})
+    assert ev["b"] == "<redacted len=303>"
+    assert ev["s"] == ["<redacted len=300>"]
+    assert ev["o"] == "<redacted len=300>"
+    assert ev["n"] == 3
+
+
+def test_keys_case_insensitive_and_tekst() -> None:
+    ev = redact_contract_text(None, "info", {"Cytat": "a", "tekst": "b", "TEXT": "c"})
+    assert ev == {"Cytat": "<redacted>", "tekst": "<redacted>", "TEXT": "<redacted>"}

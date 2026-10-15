@@ -6,26 +6,31 @@ import structlog
 from structlog.types import EventDict, Processor
 
 REDACTED_KEYS = frozenset(
-    {"text", "tresc", "cytat", "quote", "teza", "content", "uzasadnienie", "payload"}
+    {"text", "tekst", "tresc", "cytat", "quote", "teza", "content", "uzasadnienie", "payload"}
 )
 MAX_LEN = 200
 _MAX_DEPTH = 10
+_FOREIGN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access", "sqlalchemy")
 _HANDLER_MARK = "_au_structlog_handler"
 
 
 def _redact(value: Any, depth: int) -> Any:
+    if value is None or isinstance(value, bool | int | float):
+        return value
     if isinstance(value, str):
         return f"<redacted len={len(value)}>" if len(value) > MAX_LEN else value
     if depth >= _MAX_DEPTH:
-        return value
+        return "<redacted depth>"
     if isinstance(value, dict):
         return {
-            k: "<redacted>" if k in REDACTED_KEYS else _redact(v, depth + 1)
+            k: "<redacted>"
+            if isinstance(k, str) and k.lower() in REDACTED_KEYS
+            else _redact(v, depth + 1)
             for k, v in value.items()
         }
-    if isinstance(value, list | tuple):
+    if isinstance(value, list | tuple | set | frozenset):
         return [_redact(v, depth + 1) for v in value]
-    return value
+    return _redact(repr(value), depth + 1)
 
 
 def redact_contract_text(logger: Any, method_name: str, event_dict: EventDict) -> EventDict:
@@ -65,6 +70,15 @@ def configure_logging(level: str) -> None:
             ],
         )
     )
+    for name in _FOREIGN_LOGGERS:
+        lg = logging.getLogger(name)
+        lg.handlers.clear()
+        lg.propagate = True
+    for name in list(logging.root.manager.loggerDict):
+        if name.startswith("sqlalchemy."):
+            child = logging.getLogger(name)
+            child.handlers.clear()
+            child.propagate = True
     root = logging.getLogger()
     for h in [h for h in root.handlers if getattr(h, _HANDLER_MARK, False)]:
         root.removeHandler(h)
