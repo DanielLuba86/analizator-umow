@@ -119,7 +119,7 @@ def test_check_constraints_match_domain_values(db_engine: Engine) -> None:
     with db_engine.connect() as conn:
         rows = conn.execute(
             text(
-                "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE contype='c' AND conrelid <> 0"
+                "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE contype='c' AND conrelid <> 0"  # noqa: E501
             )
         ).all()
     actual = {name: set(re.findall(r"'([^']*)'", definition)) for name, definition in rows}

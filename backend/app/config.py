@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 12
     cookie_secure: bool = True
     log_level: str = "INFO"
+    seed_assistant_password: SecretStr | None = None
+    seed_lawyer_password: SecretStr | None = None
 
 
 @lru_cache
