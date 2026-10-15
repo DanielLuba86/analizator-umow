@@ -36,7 +36,7 @@ from app.agent.prompt import SYSTEM_PROMPT
 from app.agent.runner import RunOutcome
 from app.agent.tools import AgentTools, ToolResult
 from app.config import Settings
-from app.repo.models import CONTRACT_KINDS
+from app.domain.model import CONTRACT_KINDS
 
 SERVER_NAME = "umowy"
 _TOOL_NAMES = (

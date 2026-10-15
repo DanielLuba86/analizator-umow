@@ -1,5 +1,7 @@
 import hashlib
 import unicodedata
+from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -9,6 +11,23 @@ from app.repo.models import Contract, ContractVersion
 from app.repo.models import Fragment as FragmentRow
 
 VersionRow = ContractVersion
+ContractRow = Contract
+
+
+@dataclass(frozen=True)
+class ContractSummary:
+    id: int
+    title: str
+    kind: str
+    source: str
+    versions: int
+
+
+@dataclass(frozen=True)
+class VersionInfo:
+    id: int
+    nr: int
+    created_at: datetime
 
 
 def add_contract(s: Session, *, title: str, kind: str, source: str, created_by: int) -> int:
@@ -59,3 +78,37 @@ def list_fragments(s: Session, version_id: int) -> list[Fragment]:
 
 def get_version_text(s: Session, version_id: int) -> str:
     return get_version(s, version_id).text
+
+
+def list_contracts(s: Session) -> list[ContractSummary]:
+    rows = s.execute(
+        select(
+            Contract.id,
+            Contract.title,
+            Contract.kind,
+            Contract.source,
+            func.count(ContractVersion.id),
+        )
+        .outerjoin(ContractVersion, ContractVersion.contract_id == Contract.id)
+        .group_by(Contract.id)
+        .order_by(Contract.id.desc())
+    )
+    return [ContractSummary(*row) for row in rows]
+
+
+def get_contract(s: Session, contract_id: int) -> ContractRow | None:
+    return s.get(Contract, contract_id)
+
+
+def list_versions(s: Session, contract_id: int) -> list[VersionInfo]:
+    """Wersje bez treści (lista w szczegółach umowy)."""
+    rows = s.execute(
+        select(ContractVersion.id, ContractVersion.nr, ContractVersion.created_at)
+        .where(ContractVersion.contract_id == contract_id)
+        .order_by(ContractVersion.nr)
+    )
+    return [VersionInfo(*row) for row in rows]
+
+
+def find_version(s: Session, version_id: int) -> VersionRow | None:
+    return s.get(ContractVersion, version_id)

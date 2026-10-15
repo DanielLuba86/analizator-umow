@@ -7,6 +7,9 @@ FindingType = Literal["strona", "termin", "kara", "ryzyko", "wstrzyknięcie"]
 RiskLevel = Literal["niskie", "średnie", "wysokie"]
 ActionType = Literal["opinia", "wzorzec", "eksport", "kwarantanna"]
 ActionStatus = Literal["oczekuje", "zatwierdzona", "odrzucona"]
+ContractKind = Literal["najem", "dostawa", "zlecenie"]
+ContractSource = Literal["wewnętrzna", "kontrahent"]
+Role = Literal["asystent", "prawnik"]
 AnalysisStatus = Literal["queued", "running", "done", "failed", "quarantined", "budget_exceeded"]
 
 FINDING_TYPES: tuple[FindingType, ...] = get_args(FindingType)
@@ -14,6 +17,9 @@ RISK_LEVELS: tuple[RiskLevel, ...] = get_args(RiskLevel)
 ACTION_TYPES: tuple[ActionType, ...] = get_args(ActionType)
 ACTION_STATUSES: tuple[ActionStatus, ...] = get_args(ActionStatus)
 ANALYSIS_STATUSES: tuple[AnalysisStatus, ...] = get_args(AnalysisStatus)
+CONTRACT_KINDS: tuple[ContractKind, ...] = get_args(ContractKind)
+CONTRACT_SOURCES: tuple[ContractSource, ...] = get_args(ContractSource)
+ROLES: tuple[Role, ...] = get_args(Role)
 
 MAX_TEZA_LEN = 500
 

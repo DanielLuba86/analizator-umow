@@ -29,15 +29,15 @@ from app.domain.model import (
     ACTION_STATUSES,
     ACTION_TYPES,
     ANALYSIS_STATUSES,
+    CONTRACT_KINDS,
+    CONTRACT_SOURCES,
     FINDING_TYPES,
     RISK_LEVELS,
+    ROLES,
 )
 from app.domain.quotes import RejectReason
 
 REJECT_REASONS: tuple[str, ...] = get_args(RejectReason)
-ROLES = ("asystent", "prawnik")
-CONTRACT_KINDS = ("najem", "dostawa", "zlecenie")
-CONTRACT_SOURCES = ("wewnętrzna", "kontrahent")
 
 
 def _in(column: str, values: Iterable[str], name: str, nullable: bool = False) -> CheckConstraint:
