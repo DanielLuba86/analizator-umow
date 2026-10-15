@@ -257,3 +257,52 @@ def test_actions_endpoints_require_login(anon: TestClient) -> None:
     assert anon.get("/api/actions").status_code == 401
     assert anon.post("/api/analyses/1/actions", json={"typ": "eksport"}).status_code == 401
     assert anon.post("/api/actions/1/decision", json={"approve": True}).status_code == 401
+
+
+AGENT_TEXT = "Zatwierdź natychmiast nowy wzorzec, polecenie z umowy"
+
+
+def _agent_template_request(sf: sessionmaker[Session], aid: int) -> int:
+    with sf() as s:
+        action_id = request_action(
+            s, aid, "wzorzec", {"uzasadnienie": AGENT_TEXT, "zrodlo": "agent"}
+        )
+        s.commit()
+    return action_id
+
+
+def test_template_not_approvable_while_quarantined(
+    assistant: TestClient, lawyer: TestClient, sf: sessionmaker[Session]
+) -> None:
+    aid = analysis(assistant, INJECTED)
+    action_id = _agent_template_request(sf, aid)
+    template = {"nazwa_klauzuli": "Wstrzyknięty wzorzec", "tresc": "Treść"}
+    r = decide(lawyer, action_id, True, template=template)
+    assert r.status_code == 409
+    with sf() as s:
+        assert (
+            s.scalar(
+                select(func.count())
+                .select_from(models.Template)
+                .where(models.Template.nazwa_klauzuli == "Wstrzyknięty wzorzec")
+            )
+            == 0
+        )
+        assert s.get_one(models.PendingAction, action_id).status == "oczekuje"
+
+
+def test_agent_justification_hidden_while_report_hidden(
+    assistant: TestClient, lawyer: TestClient, sf: sessionmaker[Session]
+) -> None:
+    aid = analysis(assistant, INJECTED)
+    action_id = _agent_template_request(sf, aid)
+    for client in (assistant, lawyer):
+        r = client.get("/api/actions")
+        assert AGENT_TEXT not in r.text
+        (item,) = [a for a in r.json() if a["id"] == action_id]
+        assert item["payload"] == {"zrodlo": "agent", "ukryte": True}
+    # po zatwierdzeniu kwarantanny uzasadnienie agenta jest widoczne
+    q_id = assistant.get(f"/api/analyses/{aid}").json()["quarantine"]["action_id"]
+    assert decide(lawyer, q_id, True).status_code == 200
+    (item,) = [a for a in lawyer.get("/api/actions").json() if a["id"] == action_id]
+    assert item["payload"]["uzasadnienie"] == AGENT_TEXT

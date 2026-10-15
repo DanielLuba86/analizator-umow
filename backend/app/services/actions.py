@@ -105,6 +105,8 @@ def execute_approved(
     elif action.typ == "wzorzec":
         if template is None:
             raise TemplateRequired
+        if not is_report_visible(s, analysis):  # wniosek agenta z niezweryfikowanej analizy
+            raise ReportNotAvailable
         _, kind = analyses.analysis_target(s, analysis.id)
         add_template_version(s, kind, template.nazwa_klauzuli, template.tresc)
     elif action.typ == "eksport":
@@ -138,3 +140,14 @@ def decide(
     )
     audit(s, decided_by, f"decyzja:{decided.typ}:{str(approve).lower()}", f"action:{decided.id}")
     return DecisionResult(decided.status, export_id)
+
+
+def public_payload(s: Session, action: ActionRow, visible: dict[int, bool]) -> dict[str, Any]:
+    """Uzasadnienie agenta pokazujemy dopiero, gdy raport analizy jest widoczny."""
+    payload = dict(action.payload or {})
+    if payload.get("zrodlo") != "agent":
+        return payload
+    if action.analysis_id not in visible:
+        analysis = analyses.get_analysis(s, action.analysis_id)
+        visible[action.analysis_id] = analysis is not None and is_report_visible(s, analysis)
+    return payload if visible[action.analysis_id] else {"zrodlo": "agent", "ukryte": True}

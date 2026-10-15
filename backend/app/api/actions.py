@@ -80,13 +80,14 @@ REPORT_NOT_AVAILABLE = ApiError(
 def list_actions(db: DbDep, status: ActionStatus | None = None) -> list[ActionOut]:
     rows = actions.list_actions(db, status)
     export_ids = exports.export_ids_by_action(db, [a.id for a in rows])
+    visible: dict[int, bool] = {}
     return [
         ActionOut(
             id=a.id,
             typ=a.typ,
             analysis_id=a.analysis_id,
             status=a.status,
-            payload=dict(a.payload or {}),
+            payload=actions_service.public_payload(db, a, visible),
             created_at=a.created_at,
             decided_by=a.decided_by,
             decided_at=a.decided_at,
