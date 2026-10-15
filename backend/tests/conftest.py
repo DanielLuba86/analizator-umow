@@ -13,6 +13,8 @@ from app.config import get_settings
 from app.main import create_app
 from app.repo.db import make_engine
 
+pytest_plugins = ["db_env"]
+
 
 @pytest.fixture
 def client() -> TestClient:

@@ -7,6 +7,10 @@ Krótkie zapisy decyzji architektonicznych w formacie MADR. Każdy ADR mieści s
 | Nr | Tytuł | Status | Data |
 |---|---|---|---|
 | [0001](0001-python-fastapi-i-react.md) | Backend w Pythonie (FastAPI) i frontend w React | Przyjęta | 2026-10-15 |
+| [0002](0002-claude-agent-sdk-z-wlasnymi-narzedziami.md) | Claude Agent SDK wyłącznie z własnymi narzędziami | Przyjęta | 2026-10-15 |
+| [0003](0003-tezy-przez-narzedzie-z-weryfikacja-cytatow.md) | Tezy tylko przez narzędzie z weryfikacją cytatów | Przyjęta | 2026-10-15 |
+| [0004](0004-detekcja-wstrzykniec-przed-agentem.md) | Detekcja wstrzyknięć przed agentem | Przyjęta | 2026-10-15 |
+| [0005](0005-wnioski-zamiast-narzedzi-wykonawczych.md) | Wnioski zamiast narzędzi wykonawczych | Przyjęta | 2026-10-15 |
 | [0006](0006-postgresql-w-docker-compose.md) | PostgreSQL w docker-compose | Przyjęta | 2026-10-15 |
 | [0008](0008-sesje-httponly-i-dwie-role.md) | Sesje po stronie serwera (HttpOnly) i dwie role | Przyjęta | 2026-10-15 |
 

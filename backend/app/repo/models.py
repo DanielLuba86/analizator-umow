@@ -24,6 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from app.domain.fragments import MAX_FRAGMENT_ID_LEN
 from app.domain.model import (
     ACTION_STATUSES,
     ACTION_TYPES,
@@ -115,7 +116,7 @@ class Fragment(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     version_id: Mapped[int] = _fk("contract_versions.id")
-    frag_id: Mapped[str] = mapped_column(String(20))
+    frag_id: Mapped[str] = mapped_column(String(MAX_FRAGMENT_ID_LEN))
     label: Mapped[str] = mapped_column(String(200))
     start: Mapped[int] = mapped_column(Integer)
     end: Mapped[int] = mapped_column(Integer)
@@ -166,7 +167,7 @@ class Finding(Base):
     typ: Mapped[str] = mapped_column(String(20))
     teza: Mapped[str] = mapped_column(Text)
     cytat: Mapped[str] = mapped_column(Text)
-    fragment_id: Mapped[str] = mapped_column(String(20))
+    fragment_id: Mapped[str] = mapped_column(String(MAX_FRAGMENT_ID_LEN))
     start: Mapped[int] = mapped_column(Integer)
     end: Mapped[int] = mapped_column(Integer)
     poziom_ryzyka: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -189,7 +190,7 @@ class RejectedClaim(Base):
     typ: Mapped[str] = mapped_column(String(20))
     teza: Mapped[str] = mapped_column(Text)
     cytat: Mapped[str] = mapped_column(Text)
-    fragment_id: Mapped[str] = mapped_column(String(20))
+    fragment_id: Mapped[str] = mapped_column(String(MAX_FRAGMENT_ID_LEN))
     poziom_ryzyka: Mapped[str | None] = mapped_column(String(20), nullable=True)
     uzasadnienie: Mapped[str] = mapped_column(Text)
     template_id: Mapped[int | None] = mapped_column(

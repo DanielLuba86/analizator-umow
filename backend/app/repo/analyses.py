@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.model import AnalysisStatus, Claim
 from app.domain.quotes import QuoteMatch, RejectReason
-from app.repo.models import Analysis, ContractVersion, Finding, RejectedClaim
+from app.repo.models import Analysis, Contract, ContractVersion, Finding, RejectedClaim
 
 FindingRow = Finding
 
@@ -112,3 +112,14 @@ def list_findings(s: Session, analysis_id: int) -> list[FindingRow]:
             .order_by(Finding.start, Finding.id)
         )
     )
+
+
+def analysis_target(s: Session, analysis_id: int) -> tuple[int, str]:
+    """(version_id, rodzaj umowy) analizowanej wersji."""
+    row = s.execute(
+        select(Analysis.version_id, Contract.kind)
+        .join(ContractVersion, ContractVersion.id == Analysis.version_id)
+        .join(Contract, Contract.id == ContractVersion.contract_id)
+        .where(Analysis.id == analysis_id)
+    ).one()
+    return row.version_id, row.kind
