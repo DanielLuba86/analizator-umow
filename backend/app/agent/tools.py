@@ -52,6 +52,14 @@ def _neutralize(body: str) -> str:
     return _TAG_OPEN_OR_CLOSE.sub(r"&lt;\1\2", body)
 
 
+def wrap_fragment(fragment_id: str, label: str, text: str) -> str:
+    """Treść umowy jako dane: atrybuty ucieknięte, znaczniki w treści zneutralizowane."""
+    return (
+        f'<{TAG} id="{_escape_attr(fragment_id)}" label="{_escape_attr(label)}">\n'
+        f"{_neutralize(text)}\n</{TAG}>"
+    )
+
+
 class AgentTools:
     def __init__(self, ctx: AnalysisContext, session_factory: sessionmaker[Session]) -> None:
         self.ctx = ctx
@@ -90,11 +98,7 @@ class AgentTools:
                 return _error("Nieznany fragment. Użyj list_fragments, aby poznać identyfikatory.")
             text = fragment_text(contracts.get_version_text(s, self.ctx.version_id), frag)
         self._log("read_fragment", "ok", fragment_id=frag.id)
-        body = _neutralize(text)
-        return _result(
-            f'<{TAG} id="{_escape_attr(frag.id)}" label="{_escape_attr(frag.label)}">\n'
-            f"{body}\n</{TAG}>"
-        )
+        return _result(wrap_fragment(frag.id, frag.label, text))
 
     async def search_templates(self, kind: str, query: str) -> ToolResult:
         if not isinstance(kind, str) or not isinstance(query, str):

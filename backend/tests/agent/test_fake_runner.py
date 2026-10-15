@@ -1,9 +1,8 @@
-# ruff: noqa: F401, F811
 import asyncio
 from typing import Any, cast
 
 import pytest
-from test_tools import QUOTE, Env, conn, env, sf
+from db_env import QUOTE, Env
 
 from app.agent.fake_runner import FakeAgentRunner, ToolCall
 from app.agent.guard import BudgetExceeded, LoopGuard
