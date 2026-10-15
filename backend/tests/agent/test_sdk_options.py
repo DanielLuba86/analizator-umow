@@ -1,5 +1,6 @@
 # ruff: noqa: S105, S106
 import asyncio
+import os
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -125,8 +126,27 @@ def test_options_limits_from_settings() -> None:
     assert opts.max_budget_usd == 0.25
 
 
-def test_env_contains_only_api_key() -> None:
-    assert _options().env == {"ANTHROPIC_API_KEY": "sk-test-klucz"}
+def test_env_sets_only_api_key_and_blanks_inherited_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SDK dokleja os.environ do procesu CLI; nadpisujemy sekrety pustymi wartościami."""
+    for name in list(os.environ):
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:haslo@db/x")
+    monkeypatch.setenv("SEED_LAWYER_PASSWORD", "haslo")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "haslo")
+    monkeypatch.setenv("SOME_API_SECRET", "x")
+    monkeypatch.setenv("GH_TOKEN", "x")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "klucz-z-otoczenia")
+    assert _options().env == {
+        "ANTHROPIC_API_KEY": "sk-test-klucz",
+        "DATABASE_URL": "",
+        "SEED_LAWYER_PASSWORD": "",
+        "POSTGRES_PASSWORD": "",
+        "SOME_API_SECRET": "",
+        "GH_TOKEN": "",
+    }
 
 
 def test_build_options_requires_api_key() -> None:

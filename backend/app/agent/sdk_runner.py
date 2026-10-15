@@ -7,6 +7,8 @@ w komunikacie ``init`` jest sprawdzany przed pierwszą turą (fail-closed).
 
 import argparse
 import asyncio
+import os
+import re
 import shutil
 import sys
 import tempfile
@@ -46,6 +48,10 @@ _TOOL_NAMES = (
 )
 ALLOWED_TOOLS = [f"mcp__{SERVER_NAME}__{name}" for name in _TOOL_NAMES]
 TOOLSET_MISMATCH = "niezgodny_zestaw_narzedzi"
+
+# SDK dokleja os.environ procesu do środowiska CLI; options.env może tylko nadpisywać,
+# więc dziedziczone sekrety (baza, hasła seed, tokeny) zastępujemy pustymi wartościami.
+_INHERITED_SECRET = re.compile(r"^DATABASE_URL$|^SEED_|PASSWORD|SECRET|TOKEN", re.IGNORECASE)
 
 QueryFn = Callable[..., AsyncIterator[Message]]
 Gate = Callable[[], bool]
@@ -183,6 +189,11 @@ def build_mcp_server(tools: AgentTools, gate: Gate | None = None) -> McpSdkServe
     return create_sdk_mcp_server(name=SERVER_NAME, tools=build_sdk_tools(tools, gate))
 
 
+def agent_env(api_key: str) -> dict[str, str]:
+    blanked = {k: "" for k in os.environ if _INHERITED_SECRET.search(k)}
+    return {**blanked, "ANTHROPIC_API_KEY": api_key}
+
+
 def build_options(settings: Settings, server: McpSdkServerConfig) -> ClaudeAgentOptions:
     if settings.anthropic_api_key is None:
         raise ValueError("Brak ANTHROPIC_API_KEY")
@@ -196,7 +207,7 @@ def build_options(settings: Settings, server: McpSdkServerConfig) -> ClaudeAgent
         setting_sources=[],
         max_turns=settings.agent_max_turns,
         max_budget_usd=settings.agent_max_budget_usd,
-        env={"ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value()},
+        env=agent_env(settings.anthropic_api_key.get_secret_value()),
         cwd=tempfile.mkdtemp(prefix="agent-"),
     )
 
