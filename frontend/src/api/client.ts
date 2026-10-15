@@ -31,6 +31,10 @@ async function toApiError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, title, requestId);
 }
 
+/** Zdarzenie: sesja wygasła lub jest nieważna (401 poza sprawdzaniem i samym logowaniem). */
+export const UNAUTHORIZED_EVENT = "auth:unauthorized";
+const AUTH_PROBES = ["/api/auth/me", "/api/auth/login"];
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body !== undefined && !headers.has("Content-Type")) {
@@ -38,7 +42,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
   headers.set("Accept", "application/json, application/problem+json");
   const res = await fetch(path, { ...init, headers, credentials: "same-origin" });
-  if (!res.ok) throw await toApiError(res);
+  if (!res.ok) {
+    if (res.status === 401 && !AUTH_PROBES.includes(path)) {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+    throw await toApiError(res);
+  }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

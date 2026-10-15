@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 
 import { errorMessage } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { navigate } from "../router";
+import { currentPath, navigate } from "../router";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -17,7 +17,8 @@ export function LoginPage() {
     setError(null);
     try {
       await login(name, password);
-      navigate("/contracts");
+      // Po wygaśnięciu sesji zostajemy na stronie, z której przyszedł użytkownik.
+      if (["/", "/login"].includes(currentPath())) navigate("/contracts");
     } catch (err) {
       setError(errorMessage(err));
     } finally {

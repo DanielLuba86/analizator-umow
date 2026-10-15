@@ -145,3 +145,51 @@ test("polls analysis every 2 s until a final status", async () => {
   });
   expect(fetch).toHaveBeenCalledTimes(3);
 });
+
+test("polling survives a transient error", async () => {
+  vi.useFakeTimers();
+  mockFetch([
+    { path: "/api/analyses/5", body: analysis({ status: "running", findings: [] }) },
+    { path: "/api/analyses/5", status: 502, body: { title: "Bad Gateway" } },
+    { path: "/api/analyses/5", body: analysis({ status: "done" }) },
+  ]);
+  render(<Probe id={5} />);
+  await act(async () => {});
+  expect(screen.getByText("status: running")).toBeInTheDocument();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(screen.getByText("status: done")).toBeInTheDocument();
+});
+
+test("switching analysis clears the previous report while loading", async () => {
+  mockFetch([
+    { path: "/api/analyses/5", body: analysis({ status: "done" }) },
+    { path: "/api/analyses/6", status: 404, body: { title: "Nie znaleziono analizy.", request_id: "r" } },
+  ]);
+  const { rerender } = render(<Probe id={5} />);
+  expect(await screen.findByText("status: done")).toBeInTheDocument();
+  rerender(<Probe id={6} />);
+  expect(screen.getByText("status: -")).toBeInTheDocument();
+  await act(async () => {});
+  expect(screen.getByText("status: -")).toBeInTheDocument();
+});
+
+test("classifier outage banner does not claim an injection was found", () => {
+  render(
+    <RiskReport
+      analysis={analysis({
+        status: "quarantined",
+        reason: "klasyfikator_niedostępny",
+        quarantine: { action_id: 4, status: "oczekuje" },
+      })}
+      fragments={FRAGMENTS}
+    />,
+  );
+  const banner = screen.getByRole("alert");
+  expect(banner).toHaveTextContent(/klasyfikator/i);
+  expect(banner).not.toHaveTextContent(/wykryto/i);
+});

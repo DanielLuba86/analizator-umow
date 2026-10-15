@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { apiFetch, errorMessage } from "../api/client";
+import { ApiError, apiFetch, errorMessage } from "../api/client";
 import { FINAL_STATUSES, type Analysis } from "../api/types";
 
 export const POLL_MS = 2000;
@@ -12,6 +12,12 @@ export function useAnalysis(id: number | null) {
   const [tick, setTick] = useState(0);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
+
+  // Inna analiza: nie pokazuj poprzedniego raportu, zanim przyjdzie nowy.
+  useEffect(() => {
+    setAnalysis(null);
+    setError(null);
+  }, [id]);
 
   useEffect(() => {
     if (id === null) {
@@ -28,7 +34,11 @@ export function useAnalysis(id: number | null) {
         setError(null);
         if (!FINAL_STATUSES.includes(a.status)) timer = setTimeout(load, POLL_MS);
       } catch (e) {
-        if (active) setError(errorMessage(e));
+        if (!active) return;
+        setError(errorMessage(e));
+        // Błąd przejściowy (sieć, 5xx) nie zatrzymuje odpytywania; 4xx się nie zmieni.
+        const transient = !(e instanceof ApiError) || e.status >= 500;
+        if (transient) timer = setTimeout(load, POLL_MS);
       }
     };
     void load();

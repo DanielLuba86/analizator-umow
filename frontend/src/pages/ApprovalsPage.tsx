@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 
 import { ApiError, apiFetch, errorMessage, postJson } from "../api/client";
 import type { Decision, PendingAction } from "../api/types";
+import { quarantineReason } from "../document/quarantine";
 
 const ALREADY_DECIDED = "Wniosek został już rozstrzygnięty.";
 
 /** Opis wniosku jako zwykły tekst; uzasadnienie agenta bywa ukryte, dopóki raport jest niewidoczny. */
 function describe(a: PendingAction): string {
   const p = a.payload;
-  if (a.typ === "kwarantanna") return `Powód: ${String(p["powód"] ?? "nieznany")}`;
+  if (a.typ === "kwarantanna") return `Powód: ${quarantineReason(p["powód"])}.`;
   if (p.zrodlo === "agent") {
     return p.ukryte
       ? "Uzasadnienie agenta ukryte do czasu zwolnienia raportu z kwarantanny."

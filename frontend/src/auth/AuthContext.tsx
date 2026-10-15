@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { ApiError, apiFetch, postJson } from "../api/client";
+import { ApiError, UNAUTHORIZED_EVENT, apiFetch, postJson } from "../api/client";
 import type { Me } from "../api/types";
 
 type AuthState = {
@@ -34,6 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => setUser(null);
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
   }, []);
 
   const login = useCallback(async (l: string, p: string) => {

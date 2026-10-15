@@ -63,7 +63,7 @@ test("approve calls decision endpoint and removes row", async () => {
   ]);
   render(<ApprovalsPage />);
   const row = await screen.findByRole("row", { name: /kwarantanna/ });
-  expect(within(row).getByText(/wstrzyknięcie/)).toBeInTheDocument();
+  expect(within(row).getByText(/próbę wstrzyknięcia poleceń/)).toBeInTheDocument();
   await userEvent.click(within(row).getByRole("button", { name: "Zatwierdź" }));
 
   await waitFor(() => expect(screen.queryByRole("row", { name: /kwarantanna/ })).toBeNull());
@@ -138,4 +138,30 @@ test("hidden agent justification is not shown", async () => {
   render(<ApprovalsPage />);
   const row = await screen.findByRole("row", { name: /opinia/ });
   expect(within(row).getByText(/ukryte do czasu zwolnienia raportu/)).toBeInTheDocument();
+});
+
+test("quarantine reasons are described in plain words", async () => {
+  mockFetch([
+    {
+      path: "/api/actions?status=oczekuje",
+      body: [
+        action(8, "kwarantanna", { "powód": "klasyfikator_niedostępny" }),
+        action(9, "kwarantanna", { "powód": "wstrzyknięcie" }),
+      ],
+    },
+  ]);
+  render(<ApprovalsPage />);
+  expect(await screen.findByText(/klasyfikator wstrzyknięć był niedostępny/)).toBeInTheDocument();
+  expect(screen.getByText(/wykryto możliwą próbę wstrzyknięcia/)).toBeInTheDocument();
+  expect(screen.queryByText(/klasyfikator_niedostępny/)).toBeNull();
+});
+
+test("expired session returns to the login form", async () => {
+  mockFetch([
+    { path: "/api/auth/me", body: ASYSTENT },
+    { path: "/api/contracts", status: 401, body: problem(401, "Wymagane zalogowanie.", "r-1") },
+  ]);
+  render(<App />);
+  expect(await screen.findByRole("button", { name: "Zaloguj" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Wyloguj" })).toBeNull();
 });

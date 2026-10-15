@@ -1,4 +1,5 @@
 import type { Analysis, AnalysisStatus, Finding, FragmentDto, RiskLevel } from "../api/types";
+import { quarantineReason } from "./quarantine";
 
 export const STATUS_LABELS: Record<AnalysisStatus, string> = {
   queued: "w kolejce",
@@ -40,8 +41,8 @@ export function RiskReport({ analysis, fragments, selectedId = null, onSelect }:
       </p>
       {hidden && (
         <p role="alert" className="banner quarantine">
-          Analiza jest w kwarantannie: w umowie wykryto możliwą próbę wstrzyknięcia poleceń. Wyniki
-          pozostaną ukryte, dopóki prawnik nie zatwierdzi wniosku o ich udostępnienie.
+          Analiza jest w kwarantannie: {quarantineReason(analysis.reason)}. Wyniki pozostaną ukryte,
+          dopóki prawnik nie zatwierdzi wniosku o ich udostępnienie.
           {analysis.quarantine?.status === "odrzucona" && " Wniosek został odrzucony."}
         </p>
       )}
