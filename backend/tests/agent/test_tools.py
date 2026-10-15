@@ -186,6 +186,24 @@ async def test_submit_finding_wrong_fragment_is_rejected(env: Env) -> None:
     ]
 
 
+async def test_submit_finding_long_fragment_id_is_rejected_not_raised(env: Env) -> None:
+    tools = env.tools()
+    long_id = "f003-kary-umowne-paragraf-2"  # > 20 znaków (kolumna fragment_id)
+    r = await tools.submit_finding("kara", "Teza", QUOTE, long_id, "Uzasadnienie.", "wysokie")
+    assert r["is_error"] is True and "zły_fragment" in _text(r)
+    assert "INSERT" not in _text(r) and QUOTE not in _text(r)
+    assert env.rejected_reasons(tools.ctx.analysis_id) == ["zły_fragment"]
+
+
+async def test_submit_finding_out_of_range_template_id_is_error_not_raised(env: Env) -> None:
+    tools = env.tools()
+    r = await tools.submit_finding(
+        "kara", "Teza", QUOTE, "f003", "Uzasadnienie.", "wysokie", 10**12
+    )
+    assert r["is_error"] is True and "template_id" in _text(r)
+    assert env.count_findings(tools.ctx.analysis_id) == 0
+
+
 async def test_claim_invalid_is_not_stored(env: Env) -> None:
     tools = env.tools()
     r1 = await tools.submit_finding("ryzyko", "Teza", QUOTE, "f003", "Uzasadnienie.")

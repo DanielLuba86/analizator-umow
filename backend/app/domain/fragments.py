@@ -3,6 +3,8 @@
 import re
 from dataclasses import dataclass
 
+MAX_FRAGMENT_ID_LEN = 20  # długość kolumn fragment_id / frag_id w bazie
+
 _PARAGRAPH_HEADING = re.compile(r"^(?:#{1,3}\s*§\s*(\d+)|§\s*(\d+)\.)")
 _OTHER_HEADING = re.compile(r"^#{1,3}\s+(.+)")
 _LIST_ITEM = re.compile(r"^\d+\.\s")

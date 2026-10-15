@@ -16,7 +16,7 @@ from app.agent.context import AnalysisContext
 from app.agent.runner import AgentRunner
 from app.agent.tools import AgentTools
 from app.config import Settings
-from app.domain.fragments import Fragment, fragment_text
+from app.domain.fragments import MAX_FRAGMENT_ID_LEN, Fragment, fragment_text
 from app.domain.injection import scan_heuristics
 from app.domain.model import Claim
 from app.domain.quotes import QuoteNotFound, verify_quote
@@ -26,7 +26,6 @@ log = structlog.get_logger(__name__)
 
 INJECTION_TEZA = "Możliwa ukryta instrukcja dla systemu AI w treści umowy."
 CLASSIFIER_DEFAULT_REASON = "klasyfikator"
-MAX_FRAGMENT_ID_LEN = 20  # kolumna fragment_id w findings / rejected_claims
 
 QuarantineReason = Literal["wstrzyknięcie", "klasyfikator_niedostępny"]
 

@@ -9,11 +9,11 @@ import re
 from typing import Any, cast
 
 import structlog
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agent.context import AnalysisContext
-from app.domain.fragments import fragment_text
+from app.domain.fragments import MAX_FRAGMENT_ID_LEN, fragment_text
 from app.domain.model import ActionType, Claim, ClaimInvalid, validate_claim
 from app.domain.quotes import QuoteNotFound, verify_quote
 from app.repo import actions, analyses, contracts, templates
@@ -25,6 +25,8 @@ TAG = "untrusted_contract_fragment"
 _TAG_OPEN_OR_CLOSE = re.compile(rf"<(/?)({TAG})", re.IGNORECASE)
 AGENT_ACTION_TYPES: tuple[str, ...] = ("opinia", "wzorzec")
 MAX_ACTION_JUSTIFICATION_LEN = 2000
+_TEMPLATE_HINT = "Nieznany template_id. Użyj identyfikatora z search_templates."
+_MAX_DB_INT = 2**31 - 1
 _LIMIT_HINT = "Osiągnięto limit tez dla tej analizy. Nie zgłaszaj kolejnych tez."
 
 log = structlog.get_logger(__name__)
@@ -135,6 +137,9 @@ class AgentTools:
         tid = _parse_template_id(template_id)
         strings_ok = all(isinstance(v, str) for v in (typ, teza, cytat, fragment_id, uzasadnienie))
         risk_ok = poziom_ryzyka is None or isinstance(poziom_ryzyka, str)
+        if isinstance(tid, int) and not 0 < tid <= _MAX_DB_INT:
+            self._log("submit_finding", "invalid_template")
+            return _error(_TEMPLATE_HINT)
         if tid is False or not strings_ok or not risk_ok:
             self._log("submit_finding", "invalid_input")
             return _error("Nieprawidłowy typ argumentów tezy.")
@@ -142,7 +147,7 @@ class AgentTools:
             typ=cast(Any, typ),
             teza=teza,
             cytat=cytat,
-            fragment_id=fragment_id,
+            fragment_id=fragment_id[:MAX_FRAGMENT_ID_LEN],  # do zapisu; weryfikacja na pełnym id
             uzasadnienie=uzasadnienie,
             poziom_ryzyka=cast(Any, poziom_ryzyka),
             template_id=tid,
@@ -163,7 +168,7 @@ class AgentTools:
             text = contracts.get_version_text(s, self.ctx.version_id)
             frags = contracts.list_fragments(s, self.ctx.version_id)
             try:
-                match = verify_quote(text, frags, claim.fragment_id, claim.cytat)
+                match = verify_quote(text, frags, fragment_id, claim.cytat)
             except QuoteNotFound as e:
                 analyses.add_rejected(s, aid, claim, e.reason)
                 s.commit()
@@ -175,7 +180,11 @@ class AgentTools:
             except IntegrityError:
                 s.rollback()
                 self._log("submit_finding", "invalid_template")
-                return _error("Nieznany template_id. Użyj identyfikatora z search_templates.")
+                return _error(_TEMPLATE_HINT)
+            except DBAPIError:
+                s.rollback()
+                self._log("submit_finding", "db_error")
+                return _error("Nie udało się zapisać tezy. Sprawdź argumenty i spróbuj ponownie.")
         self._log("submit_finding", "accepted")
         return _json({"status": "przyjęta", "start": match.start, "end": match.end})
 
