@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.agent.classifier import ClassifierUnavailable, InjectionClassifier
 from app.agent.context import AnalysisContext
-from app.agent.runner import AgentRunner
+from app.agent.runner import AgentRunner, RunOutcome
 from app.agent.tools import AgentTools
 from app.config import Settings
 from app.domain.fragments import MAX_FRAGMENT_ID_LEN, Fragment, fragment_text
@@ -95,6 +95,38 @@ async def _detect(
     return accepted, unavailable
 
 
+def _finalize(
+    s: Session,
+    analysis_id: int,
+    classifier_unavailable: bool,
+    outcome: RunOutcome | None,
+    error: str | None,
+) -> QuarantineReason | None:
+    """Status końcowy; kwarantanna ma pierwszeństwo także po błędzie przebiegu."""
+    injected = any(f.typ == "wstrzyknięcie" for f in analyses.list_findings(s, analysis_id))
+    quarantine: QuarantineReason | None = (
+        "wstrzyknięcie"
+        if injected
+        else "klasyfikator_niedostępny"
+        if classifier_unavailable
+        else None
+    )
+    turns = outcome.turns if outcome else None
+    cost = outcome.cost_usd if outcome else None
+    if quarantine is not None:
+        actions.request_action(s, analysis_id, "kwarantanna", {"powód": quarantine})
+        analyses.set_status(
+            s, analysis_id, "quarantined", turns=turns, cost_usd=cost, reason=quarantine
+        )
+    elif outcome is not None:
+        analyses.set_status(
+            s, analysis_id, outcome.status, turns=turns, cost_usd=cost, reason=outcome.reason
+        )
+    else:
+        analyses.set_status(s, analysis_id, "failed", reason=error)
+    return quarantine
+
+
 async def run_analysis(
     analysis_id: int,
     *,
@@ -103,6 +135,7 @@ async def run_analysis(
     classifier: InjectionClassifier,
     settings: Settings,
 ) -> None:
+    classifier_unavailable = False
     try:
         with session_factory() as s:
             version_id, kind = analyses.analysis_target(s, analysis_id)
@@ -116,33 +149,7 @@ async def run_analysis(
         outcome = await runner.run(ctx, AgentTools(ctx, session_factory))
 
         with session_factory() as s:
-            injected = any(f.typ == "wstrzyknięcie" for f in analyses.list_findings(s, analysis_id))
-            quarantine: QuarantineReason | None = (
-                "wstrzyknięcie"
-                if injected
-                else "klasyfikator_niedostępny"
-                if classifier_unavailable
-                else None
-            )
-            if quarantine is not None:
-                actions.request_action(s, analysis_id, "kwarantanna", {"powód": quarantine})
-                analyses.set_status(
-                    s,
-                    analysis_id,
-                    "quarantined",
-                    turns=outcome.turns,
-                    cost_usd=outcome.cost_usd,
-                    reason=quarantine,
-                )
-            else:
-                analyses.set_status(
-                    s,
-                    analysis_id,
-                    outcome.status,
-                    turns=outcome.turns,
-                    cost_usd=outcome.cost_usd,
-                    reason=outcome.reason,
-                )
+            quarantine = _finalize(s, analysis_id, classifier_unavailable, outcome, None)
             s.commit()
         log.info(
             "analysis_finished",
@@ -157,7 +164,7 @@ async def run_analysis(
         log.error("analysis_failed", analysis_id=analysis_id, error=type(e).__name__)
         try:
             with session_factory() as s:
-                analyses.set_status(s, analysis_id, "failed", reason=type(e).__name__)
+                _finalize(s, analysis_id, classifier_unavailable, None, type(e).__name__)
                 s.commit()
         except Exception as e2:  # noqa: BLE001
             log.error(

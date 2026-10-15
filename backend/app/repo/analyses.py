@@ -123,3 +123,30 @@ def analysis_target(s: Session, analysis_id: int) -> tuple[int, str]:
         .where(Analysis.id == analysis_id)
     ).one()
     return row.version_id, row.kind
+
+
+def get_analysis(s: Session, analysis_id: int) -> Analysis | None:
+    return s.get(Analysis, analysis_id)
+
+
+def latest_done_analysis(s: Session, version_id: int) -> int | None:
+    return s.scalar(
+        select(Analysis.id)
+        .where(Analysis.version_id == version_id, Analysis.status == "done")
+        .order_by(Analysis.id.desc())
+        .limit(1)
+    )
+
+
+def mark_official(s: Session, analysis_id: int) -> None:
+    a = s.execute(select(Analysis).where(Analysis.id == analysis_id)).scalar_one()
+    a.official = True
+    s.flush()
+
+
+def fail_interrupted(s: Session, reason: str) -> list[int]:
+    """Analizy queued/running (przerwane, np. restartem procesu) → failed."""
+    ids = list(s.scalars(select(Analysis.id).where(Analysis.status.in_(ACTIVE_STATUSES))))
+    for analysis_id in ids:
+        set_status(s, analysis_id, "failed", reason=reason)
+    return ids

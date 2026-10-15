@@ -14,10 +14,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.agent.context import AnalysisContext
 from app.domain.fragments import MAX_FRAGMENT_ID_LEN, fragment_text
-from app.domain.model import ActionType, Claim, ClaimInvalid, validate_claim
+from app.domain.model import CONTRACT_KINDS, ActionType, Claim, ClaimInvalid, validate_claim
 from app.domain.quotes import QuoteNotFound, verify_quote
 from app.repo import actions, analyses, contracts, templates
-from app.repo.models import CONTRACT_KINDS
 
 ToolResult = dict[str, Any]
 

@@ -278,3 +278,25 @@ async def test_unexpected_error_marks_failed_without_contract_text_in_logs(
     assert SECRET_MARKER not in caplog.text
     assert SECRET_MARKER not in repr(logs)
     assert any(e.get("error") == "RuntimeError" for e in logs)
+
+
+class _Exploding:
+    async def run(self, ctx: AnalysisContext, tools: AgentTools) -> RunOutcome:
+        raise RuntimeError("awaria po detekcji")
+
+
+async def test_error_after_injection_detected_still_quarantines(env: Env) -> None:
+    text = (INJECTED_DIR / INJECTED_VARIANTS[0]).read_text(encoding="utf-8")
+    aid = new_analysis(env, text)
+    await go(env, aid, runner=_Exploding())
+    a = analysis_row(env, aid)
+    assert (a.status, a.reason) == ("quarantined", "wstrzyknięcie")
+    assert ("kwarantanna", {"powód": "wstrzyknięcie"}) in pending(env, aid)
+
+
+async def test_error_after_classifier_unavailable_still_quarantines(env: Env) -> None:
+    aid = new_analysis(env, CLEAN)
+    await go(env, aid, runner=_Exploding(), classifier=FakeClassifier(ClassifierUnavailable()))
+    a = analysis_row(env, aid)
+    assert (a.status, a.reason) == ("quarantined", "klasyfikator_niedostępny")
+    assert pending(env, aid) == [("kwarantanna", {"powód": "klasyfikator_niedostępny"})]

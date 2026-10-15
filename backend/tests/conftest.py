@@ -18,7 +18,7 @@ pytest_plugins = ["db_env"]
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app())
+    return TestClient(create_app(recover_interrupted=False))
 
 
 @pytest.fixture(scope="session")
