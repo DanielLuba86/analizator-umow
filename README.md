@@ -19,8 +19,8 @@ prawnych.
 ## Wymagania
 
 - Docker z Docker Compose v2.
-- Klucz API Anthropic (`ANTHROPIC_API_KEY`). Bez klucza aplikacja działa, ale analiza kończy się
-  kwarantanną (klasyfikator niedostępny) albo błędem agenta.
+- Klucz API Anthropic (`ANTHROPIC_API_KEY`). Bez klucza aplikacja działa, ale każda analiza kończy
+  się kwarantanną (klasyfikator niedostępny).
 - Do testów lokalnych (opcjonalnie):
   - [uv](https://docs.astral.sh/uv/) z Pythonem 3.12;
   - Node.js 22.
@@ -43,10 +43,11 @@ Uzupełnij w `.env`:
 Następnie:
 
 ```bash
-docker compose up -d --build
-docker compose exec backend alembic upgrade head      # schemat bazy
+docker compose up -d --build                          # backend przy starcie wykonuje migracje (alembic upgrade head)
 docker compose exec backend python -m app.repo.seed   # wzorce klauzul i konta demo
 ```
+
+Seed można uruchamiać wielokrotnie: istniejących wzorców i kont nie duplikuje.
 
 Aplikacja działa pod adresem **http://localhost:8080**. API jest też bezpośrednio pod
 http://localhost:8000; `curl localhost:8080/api/health` zwraca `{"status":"ok"}`.
@@ -91,6 +92,8 @@ npx vitest run
 npm run lint && npx tsc --noEmit
 ```
 
+Po testach zatrzymaj bazę testową: `docker stop analizator-testdb` (kontener usunie się sam).
+
 Dokumentacja (12 sekcji arc42, diagramy Mermaid, linki):
 
 ```bash
@@ -109,6 +112,10 @@ syntetycznych umów. Skrypt kończy się kodem 1, gdy:
 
 Koszt to w przybliżeniu liczba umów × `AGENT_MAX_BUDGET_USD`. Bez flagi skrypt podaje tylko
 szacunek.
+
+Skrypt zapisuje wyniki w bazie aplikacji. Umowy mają tytuły „Ewaluacja: …”, a umowy
+z wstrzyknięciem dodają wnioski `kwarantanna` do kolejki prawnika. Uruchamiaj go na instancji
+demonstracyjnej, nie na bazie z prawdziwą pracą.
 
 ```bash
 docker compose run --rm -v "$PWD/scripts:/scripts:ro" -v "$PWD/data:/data:ro" \

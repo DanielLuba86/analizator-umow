@@ -8,6 +8,9 @@ którakolwiek przyjęta teza ma cytat, którego nie ma dosłownie w dokumencie.
 Kosztuje: około (liczba umów) × AGENT_MAX_BUDGET_USD plus klasyfikator. Dlatego bez flagi
 `--zgoda-na-koszt` skrypt tylko wypisuje szacunek i kończy się bez wywołań API.
 
+Skrypt zapisuje umowy („Ewaluacja: …”), analizy i wnioski `kwarantanna` w bazie aplikacji —
+uruchamiaj go na instancji demonstracyjnej.
+
 Uruchomienie w kontenerze backendu (baza i .env jak w aplikacji, po migracjach i seedzie):
 
     docker compose run --rm -v "$PWD/scripts:/scripts:ro" -v "$PWD/data:/data:ro" \\

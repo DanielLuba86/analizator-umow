@@ -24,7 +24,7 @@ flowchart LR
 | Element | Obraz / konfiguracja | Uwagi |
 |---|---|---|
 | `db` | `postgres:16`, wolumen `pgdata`, healthcheck `pg_isready` | backend startuje po `service_healthy` |
-| `backend` | `backend/Dockerfile`: Python 3.12, `uv sync --frozen --no-dev`, użytkownik bez uprawnień `appuser`; zawiera `alembic.ini` i migracje | konfiguracja z `.env`; wzorce klauzul z `data/wzorce` montowanych tylko do odczytu |
+| `backend` | `backend/Dockerfile`: Python 3.12, `uv sync --frozen --no-dev`, użytkownik bez uprawnień `appuser`; zawiera `alembic.ini` i migracje; przy starcie `alembic upgrade head`, potem uvicorn | konfiguracja z `.env`; wzorce klauzul z `data/wzorce` montowanych tylko do odczytu; `restart: unless-stopped` |
 | `frontend` | `frontend/Dockerfile`: build Vite, serwowany przez nginx | CSP, proxy `/api/` do `backend:8000` |
 
 ## Uruchomienie
@@ -32,9 +32,11 @@ flowchart LR
 Pełna instrukcja jest w [README](../../README.md). W skrócie:
 
 1. `cp .env.example .env` i uzupełnienie `ANTHROPIC_API_KEY` oraz haseł.
-2. `docker compose up -d --build`.
-3. `docker compose exec backend alembic upgrade head` — migracje.
-4. `docker compose exec backend python -m app.repo.seed` — wzorce klauzul i konta demo.
+2. `docker compose up -d --build` — backend przy starcie wykonuje migracje.
+3. `docker compose exec backend python -m app.repo.seed` — wzorce klauzul i konta demo.
+
+Migracje muszą poprzedzać start aplikacji, bo przy starcie oznacza ona przerwane analizy jako
+`failed`, a do tego potrzebuje tabeli `analyses`.
 
 ## Konfiguracja
 

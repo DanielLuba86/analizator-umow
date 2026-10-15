@@ -16,4 +16,5 @@ RUN useradd --system --no-create-home appuser
 USER appuser
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# Migracje przed startem: lifespan aplikacji czyta tabelę analyses (sprzątanie po restarcie).
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000"]
