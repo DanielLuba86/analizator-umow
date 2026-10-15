@@ -38,12 +38,15 @@ export type VersionCreated = { version_id: number; nr: number };
 
 export type FragmentDto = { id: string; label: string; start: number; end: number };
 
+export type VersionAnalysis = { id: number; status: AnalysisStatus; started_at: string };
+
 export type Version = {
   id: number;
   contract_id: number;
   nr: number;
   text: string;
   fragments: FragmentDto[];
+  analyses: VersionAnalysis[];
 };
 
 export type Finding = {
