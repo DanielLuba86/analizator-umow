@@ -129,6 +129,15 @@ def get_analysis(s: Session, analysis_id: int) -> Analysis | None:
     return s.get(Analysis, analysis_id)
 
 
+def list_analyses(s: Session, version_id: int) -> list[Analysis]:
+    """Analizy wersji, od najnowszej."""
+    return list(
+        s.scalars(
+            select(Analysis).where(Analysis.version_id == version_id).order_by(Analysis.id.desc())
+        )
+    )
+
+
 def latest_done_analysis(s: Session, version_id: int) -> int | None:
     return s.scalar(
         select(Analysis.id)
