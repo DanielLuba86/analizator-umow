@@ -124,6 +124,17 @@ def test_new_analysis_allowed_after_previous_finished(client: TestClient, agent:
     assert second != first
 
 
+def test_version_lists_its_analyses_newest_first(client: TestClient, agent: Agent) -> None:
+    vid = new_version(client)
+    assert client.get(f"/api/versions/{vid}").json()["analyses"] == []
+    first = start(client, vid)
+    second = start(client, vid)
+    analyses = client.get(f"/api/versions/{vid}").json()["analyses"]
+    assert [a["id"] for a in analyses] == [second, first]
+    assert all(a["status"] == "done" for a in analyses)
+    assert set(analyses[0]) == {"id", "status", "started_at"}
+
+
 def test_start_unknown_version_404(client: TestClient, agent: Agent) -> None:
     assert client.post("/api/versions/999999/analyses").status_code == 404
     assert client.get("/api/analyses/999999").status_code == 404

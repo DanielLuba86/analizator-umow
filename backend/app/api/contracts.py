@@ -9,6 +9,7 @@ from app.api.deps import DbDep, SettingsDep, UserDep, current_user
 from app.api.errors import ApiError
 from app.config import Settings
 from app.domain.model import ContractKind, ContractSource
+from app.repo import analyses as analyses_repo
 from app.repo import contracts as contracts_repo
 from app.repo.audit import audit
 
@@ -69,12 +70,19 @@ class FragmentOut(BaseModel):
     end: int
 
 
+class VersionAnalysis(BaseModel):
+    id: int
+    status: str
+    started_at: str
+
+
 class VersionOut(BaseModel):
     id: int
     contract_id: int
     nr: int
     text: str
     fragments: list[FragmentOut]
+    analyses: list[VersionAnalysis]
 
 
 def check_contract_text(text: str, settings: Settings) -> None:
@@ -145,4 +153,15 @@ def get_version(version_id: int, db: DbDep) -> VersionOut:
         FragmentOut(id=f.id, label=f.label, start=f.start, end=f.end)
         for f in contracts_repo.list_fragments(db, version_id)
     ]
-    return VersionOut(id=v.id, contract_id=v.contract_id, nr=v.nr, text=v.text, fragments=fragments)
+    runs = [
+        VersionAnalysis(id=a.id, status=a.status, started_at=a.started_at.isoformat())
+        for a in analyses_repo.list_analyses(db, version_id)
+    ]
+    return VersionOut(
+        id=v.id,
+        contract_id=v.contract_id,
+        nr=v.nr,
+        text=v.text,
+        fragments=fragments,
+        analyses=runs,
+    )
