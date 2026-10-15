@@ -128,7 +128,7 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
                 >
                   {version.analyses.map((a) => (
                     <option key={a.id} value={a.id}>
-                      #{a.id} — {STATUS_LABELS[a.status]}
+                      #{a.id} — {STATUS_LABELS[a.id === analysis?.id ? analysis.status : a.status]}
                     </option>
                   ))}
                 </select>

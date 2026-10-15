@@ -1,0 +1,203 @@
+/* Style tylko z pliku: CSP (nginx.conf) zabrania stylów inline. */
+:root {
+  --bg: #ffffff;
+  --fg: #1d1d1f;
+  --muted: #5f6368;
+  --line: #d9dce1;
+  --accent: #1f5fbf;
+  --mark: #fff1a8;
+  --mark-selected: #ffc94d;
+  --danger: #b3261e;
+  --danger-bg: #fdecea;
+  --warn-bg: #fff4e0;
+  --risk-high: #b3261e;
+  --risk-mid: #9a6700;
+  --risk-low: #1e7d32;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 12px;
+}
+
+a {
+  color: var(--accent);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.topbar nav,
+.versions,
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.versions a[aria-current="page"] {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.user button {
+  margin-left: 8px;
+}
+
+form label,
+.template-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.login {
+  max-width: 360px;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.meta,
+.status {
+  color: var(--muted);
+}
+
+.banner {
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.banner.quarantine {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.banner.incomplete {
+  background: var(--warn-bg);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.document,
+.side-by-side pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 0;
+}
+
+.document mark {
+  background: var(--mark);
+  cursor: pointer;
+}
+
+.document mark.selected {
+  background: var(--mark-selected);
+  outline: 2px solid var(--mark-selected);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.report tbody tr {
+  cursor: pointer;
+}
+
+.report tr.selected {
+  background: var(--warn-bg);
+}
+
+.quote {
+  font-style: italic;
+}
+
+.risk-wysokie {
+  color: var(--risk-high);
+  font-weight: 700;
+}
+
+.risk-średnie {
+  color: var(--risk-mid);
+}
+
+.risk-niskie {
+  color: var(--risk-low);
+}
+
+.side-by-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.decision {
+  white-space: nowrap;
+}
+
+.decision button + button {
+  margin-left: 6px;
+}

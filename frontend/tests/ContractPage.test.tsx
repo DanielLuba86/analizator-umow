@@ -77,6 +77,7 @@ test("shows latest version and starts an analysis", async () => {
 
   expect(await screen.findByText("Wysoka kara dzienna")).toBeInTheDocument();
   expect(document.querySelector("mark")).toHaveTextContent(QUOTE);
+  expect(screen.getByRole("option", { name: "#7 — zakończona" })).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledWith("/api/versions/11/analyses", expect.objectContaining({ method: "POST" }));
 });
 
