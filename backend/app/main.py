@@ -7,15 +7,22 @@ from fastapi import FastAPI, Request, Response
 from app.api import actions, analyses, auth, contracts
 from app.api.errors import REQUEST_ID_HEADER, install_error_handlers, new_request_id
 from app.config import get_settings
+from app.repo.db import make_engine, session_factory
 from app.security.logging import configure_logging
+from app.services.recovery import recover_interrupted_analyses
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    if app.state.recover_interrupted:
+        engine = make_engine(get_settings().database_url)
+        app.state.engine = engine
+        app.state.session_factory = session_factory(engine)
+        recover_interrupted_analyses(app.state.session_factory)
     yield
-    engine = getattr(app.state, "engine", None)
-    if engine is not None:
-        engine.dispose()
+    created = getattr(app.state, "engine", None)
+    if created is not None:
+        created.dispose()
 
 
 async def _request_id(
@@ -32,9 +39,10 @@ async def _request_id(
     return response
 
 
-def create_app() -> FastAPI:
+def create_app(*, recover_interrupted: bool = True) -> FastAPI:
     configure_logging(get_settings().log_level)
     app = FastAPI(title="Analizator umów", lifespan=_lifespan)
+    app.state.recover_interrupted = recover_interrupted
     app.middleware("http")(_request_id)
     install_error_handlers(app)
     app.include_router(auth.router)

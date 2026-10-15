@@ -20,5 +20,5 @@ Analiza umowy trwa od kilkunastu sekund do kilku minut (limit `AGENT_TIMEOUT_S=3
 ## Konsekwencje
 
 - Wdrożenie pozostaje jednym kontenerem backendu.
-- Po restarcie serwera przerwana analiza zostaje w stanie `queued`/`running` i blokuje kolejne analizy tej wersji (409). Potrzebne jest sprzątanie przy starcie (oznaczenie takich analiz jako `failed`) — do zrobienia przed użyciem produkcyjnym.
+- Przerwana restartem analiza nie jest wznawiana: przy starcie aplikacja oznacza wszystkie analizy `queued`/`running` jako `failed` (`przerwana_restartem`), więc wersję można przeanalizować ponownie. To zakłada jeden proces backendu — przy wielu workerach sprzątanie przerwałoby cudze analizy.
 - Wiele równoległych analiz konkuruje o zasoby jednego procesu; przy większej skali decyzję należy zastąpić kolejką.

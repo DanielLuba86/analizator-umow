@@ -22,7 +22,7 @@ def settings() -> Settings:
 
 @pytest.fixture
 def app(sf: sessionmaker[Session], settings: Settings) -> FastAPI:
-    application = create_app()
+    application = create_app(recover_interrupted=False)  # baza testowa: transakcja `sf`
     application.dependency_overrides[get_session_factory] = lambda: sf
     application.dependency_overrides[get_app_settings] = lambda: settings
     return application

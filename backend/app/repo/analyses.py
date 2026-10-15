@@ -142,3 +142,11 @@ def mark_official(s: Session, analysis_id: int) -> None:
     a = s.execute(select(Analysis).where(Analysis.id == analysis_id)).scalar_one()
     a.official = True
     s.flush()
+
+
+def fail_interrupted(s: Session, reason: str) -> list[int]:
+    """Analizy queued/running (przerwane, np. restartem procesu) → failed."""
+    ids = list(s.scalars(select(Analysis.id).where(Analysis.status.in_(ACTIVE_STATUSES))))
+    for analysis_id in ids:
+        set_status(s, analysis_id, "failed", reason=reason)
+    return ids
