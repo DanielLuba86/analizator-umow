@@ -10,7 +10,7 @@ Kosztuje: około (liczba umów) × AGENT_MAX_BUDGET_USD plus klasyfikator. Dlate
 
 Uruchomienie w kontenerze backendu (baza i .env jak w aplikacji, po migracjach i seedzie):
 
-    docker compose run --rm -v ./scripts:/scripts:ro -v ./data:/data:ro \\
+    docker compose run --rm -v "$PWD/scripts:/scripts:ro" -v "$PWD/data:/data:ro" \\
       backend python /scripts/eval_live.py --zgoda-na-koszt
 """
 
