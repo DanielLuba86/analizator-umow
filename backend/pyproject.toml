@@ -1,0 +1,38 @@
+[project]
+name = "analizator-umow-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "alembic",
+    "psycopg[binary]",
+    "pydantic-settings",
+    "argon2-cffi",
+    "claude-agent-sdk",
+    "anthropic",
+    "structlog",
+]
+
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio", "httpx", "ruff", "mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+packages = ["app"]
+
