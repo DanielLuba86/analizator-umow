@@ -26,7 +26,6 @@ def db_engine() -> Iterator[Engine]:
         pytest.fail(
             "DATABASE_URL nie jest ustawiony — testy bazy wymagają Postgresa", pytrace=False
         )
-    os.environ["DATABASE_URL"] = url
     get_settings.cache_clear()
     backend_dir = Path(__file__).resolve().parent.parent
     cfg = Config(str(backend_dir / "alembic.ini"))
