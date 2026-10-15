@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.model import ActionType
+from app.domain.model import ActionStatus, ActionType
 from app.repo.models import PendingAction
 
 ActionRow = PendingAction
@@ -64,3 +64,14 @@ def latest_action(s: Session, analysis_id: int, typ: ActionType) -> ActionRow | 
         .order_by(PendingAction.id.desc())
         .limit(1)
     )
+
+
+def get_action(s: Session, action_id: int) -> ActionRow | None:
+    return s.get(PendingAction, action_id)
+
+
+def list_actions(s: Session, status: ActionStatus | None = None) -> list[ActionRow]:
+    stmt = select(PendingAction).order_by(PendingAction.id)
+    if status is not None:
+        stmt = stmt.where(PendingAction.status == status)
+    return list(s.scalars(stmt))

@@ -16,16 +16,14 @@ from app.agent.runner import AgentRunner
 from app.agent.sdk_runner import SdkAgentRunner
 from app.api.deps import DbDep, SettingsDep, UserDep, current_user, get_session_factory
 from app.api.errors import ApiError
-from app.repo import actions, analyses, contracts
-from app.repo.analyses import AnalysisAlreadyActive
+from app.repo import analyses, contracts
+from app.repo.analyses import AnalysisAlreadyActive, FindingRow
 from app.repo.audit import audit
 from app.services.analysis import run_analysis
 from app.services.comparison import VersionsOfDifferentContracts, compare_versions
+from app.services.reports import INCOMPLETE_STATUSES, quarantine_state, visible_findings
 
 router = APIRouter(prefix="/api", tags=["analyses"], dependencies=[Depends(current_user)])
-
-REPORT_VISIBLE_STATUSES = ("done", "budget_exceeded", "failed")
-INCOMPLETE_STATUSES = ("budget_exceeded", "failed")
 
 
 def get_runner(settings: SettingsDep) -> AgentRunner:
@@ -51,6 +49,21 @@ class FindingOut(BaseModel):
     poziom_ryzyka: str | None
     uzasadnienie: str
     template_id: int | None
+
+
+def finding_out(f: FindingRow) -> FindingOut:
+    return FindingOut(
+        id=f.id,
+        typ=f.typ,
+        teza=f.teza,
+        cytat=f.cytat,
+        fragment_id=f.fragment_id,
+        start=f.start,
+        end=f.end,
+        poziom_ryzyka=f.poziom_ryzyka,
+        uzasadnienie=f.uzasadnienie,
+        template_id=f.template_id,
+    )
 
 
 class QuarantineOut(BaseModel):
@@ -123,32 +136,9 @@ def get_report(analysis_id: int, db: DbDep) -> AnalysisReport:
     a = analyses.get_analysis(db, analysis_id)
     if a is None:
         raise ANALYSIS_NOT_FOUND
-    quarantine: QuarantineOut | None = None
-    visible = a.status in REPORT_VISIBLE_STATUSES
-    if a.status == "quarantined":
-        action = actions.latest_action(db, analysis_id, "kwarantanna")
-        if action is not None:
-            quarantine = QuarantineOut(action_id=action.id, status=action.status)
-        visible = action is not None and action.status == "zatwierdzona"
-    findings = (
-        [
-            FindingOut(
-                id=f.id,
-                typ=f.typ,
-                teza=f.teza,
-                cytat=f.cytat,
-                fragment_id=f.fragment_id,
-                start=f.start,
-                end=f.end,
-                poziom_ryzyka=f.poziom_ryzyka,
-                uzasadnienie=f.uzasadnienie,
-                template_id=f.template_id,
-            )
-            for f in analyses.list_findings(db, analysis_id)
-        ]
-        if visible
-        else []
-    )
+    q = quarantine_state(db, analysis_id)
+    quarantine = None if q is None else QuarantineOut(action_id=q.action_id, status=q.status)
+    findings = [finding_out(f) for f in visible_findings(db, a)]
     return AnalysisReport(
         id=a.id,
         version_id=a.version_id,

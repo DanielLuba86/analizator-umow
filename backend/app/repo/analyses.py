@@ -136,3 +136,9 @@ def latest_done_analysis(s: Session, version_id: int) -> int | None:
         .order_by(Analysis.id.desc())
         .limit(1)
     )
+
+
+def mark_official(s: Session, analysis_id: int) -> None:
+    a = s.execute(select(Analysis).where(Analysis.id == analysis_id)).scalar_one()
+    a.official = True
+    s.flush()
