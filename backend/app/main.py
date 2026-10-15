@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request, Response
 
-from app.api import auth, contracts
+from app.api import analyses, auth, contracts
 from app.api.errors import REQUEST_ID_HEADER, install_error_handlers, new_request_id
 from app.config import get_settings
 from app.security.logging import configure_logging
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     app.include_router(auth.router)
     app.include_router(contracts.router)
+    app.include_router(analyses.router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

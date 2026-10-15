@@ -123,3 +123,16 @@ def analysis_target(s: Session, analysis_id: int) -> tuple[int, str]:
         .where(Analysis.id == analysis_id)
     ).one()
     return row.version_id, row.kind
+
+
+def get_analysis(s: Session, analysis_id: int) -> Analysis | None:
+    return s.get(Analysis, analysis_id)
+
+
+def latest_done_analysis(s: Session, version_id: int) -> int | None:
+    return s.scalar(
+        select(Analysis.id)
+        .where(Analysis.version_id == version_id, Analysis.status == "done")
+        .order_by(Analysis.id.desc())
+        .limit(1)
+    )

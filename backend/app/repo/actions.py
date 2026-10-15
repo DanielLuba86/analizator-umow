@@ -54,3 +54,13 @@ def list_pending(s: Session) -> list[ActionRow]:
             .order_by(PendingAction.id)
         )
     )
+
+
+def latest_action(s: Session, analysis_id: int, typ: ActionType) -> ActionRow | None:
+    """Najnowszy wniosek danego typu dla analizy (dowolny status)."""
+    return s.scalar(
+        select(PendingAction)
+        .where(PendingAction.analysis_id == analysis_id, PendingAction.typ == typ)
+        .order_by(PendingAction.id.desc())
+        .limit(1)
+    )
