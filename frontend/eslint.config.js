@@ -11,7 +11,7 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     languageOptions: { globals: { ...globals.browser } },
     plugins: { react },
-    settings: { react: { version: "18" } },
+    settings: { react: { version: "19" } },
     rules: {
       "react/no-danger": "error",
       // CSP (style-src 'self') blokuje atrybut style=; style tylko w styles.css.
