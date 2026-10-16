@@ -7,8 +7,8 @@ flowchart LR
   B["Przeglądarka"] -- "http://localhost:8080" --> FE
   subgraph host["Host z Dockerem"]
     subgraph compose["docker-compose"]
-      FE["frontend<br/>nginx: SPA + proxy /api<br/>port 8080→80"]
-      BE["backend<br/>uvicorn app.main:create_app<br/>port 8000"]
+      FE["frontend<br/>nginx bez roota: SPA + proxy /api<br/>port 8080→8080"]
+      BE["backend<br/>uvicorn app.main:create_app<br/>port 8000 (tylko w sieci compose)"]
       DB[("db<br/>postgres:16<br/>wolumen pgdata")]
     end
     ENV[".env<br/>(poza repozytorium)"]
@@ -25,7 +25,7 @@ flowchart LR
 |---|---|---|
 | `db` | `postgres:16`, wolumen `pgdata`, healthcheck `pg_isready` | backend startuje po `service_healthy` |
 | `backend` | `backend/Dockerfile`: Python 3.12, `uv sync --frozen --no-dev`, użytkownik bez uprawnień `appuser`; zawiera `alembic.ini` i migracje; przy starcie `alembic upgrade head`, potem uvicorn | konfiguracja z `.env`; wzorce klauzul z `data/wzorce` montowanych tylko do odczytu; `restart: unless-stopped` |
-| `frontend` | `frontend/Dockerfile`: build Vite, serwowany przez nginx | CSP, proxy `/api/` do `backend:8000` |
+| `frontend` | `frontend/Dockerfile`: build Vite, serwowany przez `nginx-unprivileged` (bez roota, port 8080) | CSP, proxy `/api/` do `backend:8000` z nagłówkiem `Host` zawierającym port, limit ciała 1 MB, limit logowania 10/min na IP |
 
 ## Uruchomienie
 
@@ -46,7 +46,8 @@ Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](..
 - klucz Anthropic;
 - modele;
 - limity agenta;
-- maksymalna długość umowy;
+- maksymalna długość umowy i rozmiar ciała żądania;
+- limit analiz trwających jednocześnie (`MAX_ACTIVE_ANALYSES`);
 - czas życia sesji;
 - `COOKIE_SECURE` (`true` za TLS);
 - poziom logów;
@@ -57,4 +58,9 @@ Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](..
 - Jeden proces backendu. Analizy działają w tle tego procesu, a sprzątanie po restarcie zakłada
   brak drugiej instancji ([ADR 0007](../adr/0007-zadania-w-tle-bez-kolejki.md)).
 - Brak TLS w compose. Produkcja wymaga reverse proxy z TLS i `COOKIE_SECURE=true`.
+- Backend nie jest wystawiony na hosta: jedynym wejściem jest nginx, który dodaje CSP i limity.
+  Reverse proxy przed nginx musi przekazywać nagłówek `Host` bez zmian, bo backend porównuje
+  z nim nagłówek `Origin`.
+- Obrazy bazowe są przypięte (`uv` po wersji i digeście, `nginx-unprivileged` po digeście);
+  aktualizacje proponuje Dependabot.
 - CI (GitHub Actions) uruchamia testy backendu z PostgreSQL jako service container.
