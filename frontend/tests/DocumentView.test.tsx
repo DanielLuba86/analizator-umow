@@ -1,4 +1,5 @@
 import { act, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 
 import type { Analysis, Finding } from "../src/api/types";
@@ -192,4 +193,28 @@ test("classifier outage banner does not claim an injection was found", () => {
   const banner = screen.getByRole("alert");
   expect(banner).toHaveTextContent(/klasyfikator/i);
   expect(banner).not.toHaveTextContent(/wykryto/i);
+});
+
+
+test("repeated click on overlapping highlight cycles findings", async () => {
+  const user = userEvent.setup();
+  const start = TEXT.indexOf(QUOTE);
+  const findings = [finding({ id: 1 }), finding({ id: 2, start, end: start + 7 })];
+  function Harness() {
+    const [selected, setSelected] = useState<number | null>(null);
+    return (
+      <>
+        <DocumentView text={TEXT} findings={findings} selectedId={selected} onSelect={setSelected} />
+        <output>{selected ?? "brak"}</output>
+      </>
+    );
+  }
+  render(<Harness />);
+  const overlap = () => document.querySelector('mark[data-finding-ids="1 2"]') as HTMLElement;
+  await user.click(overlap());
+  expect(screen.getByRole("status")).toHaveTextContent("1");
+  await user.click(overlap());
+  expect(screen.getByRole("status")).toHaveTextContent("2");
+  await user.click(overlap());
+  expect(screen.getByRole("status")).toHaveTextContent("1");
 });

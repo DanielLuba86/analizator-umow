@@ -12,6 +12,10 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
     plugins: { react },
     settings: { react: { version: "18" } },
-    rules: { "react/no-danger": "error" },
+    rules: {
+      "react/no-danger": "error",
+      // CSP (style-src 'self') blokuje atrybut style=; style tylko w styles.css.
+      "react/forbid-dom-props": ["error", { forbid: ["style"] }],
+    },
   },
 );

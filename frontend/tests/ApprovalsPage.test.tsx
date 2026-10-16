@@ -165,3 +165,19 @@ test("expired session returns to the login form", async () => {
   expect(await screen.findByRole("button", { name: "Zaloguj" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Wyloguj" })).toBeNull();
 });
+
+test("double click on approve sends one decision", async () => {
+  const fetch = mockFetch([
+    { path: "/api/actions?status=oczekuje", body: PENDING },
+    {
+      method: "POST",
+      path: "/api/actions/1/decision",
+      body: { id: 1, status: "zatwierdzona", export_id: null },
+    },
+  ]);
+  render(<ApprovalsPage />);
+  const row = await screen.findByRole("row", { name: /kwarantanna/ });
+  await userEvent.dblClick(within(row).getByRole("button", { name: "Zatwierdź" }));
+  await waitFor(() => expect(screen.queryByRole("row", { name: /kwarantanna/ })).toBeNull());
+  expect(fetch.mock.calls.filter(([url]) => url === "/api/actions/1/decision")).toHaveLength(1);
+});

@@ -3,27 +3,27 @@ import { useState, type FormEvent } from "react";
 import { errorMessage } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { currentPath, navigate } from "../router";
+import { useBusy } from "../useBusy";
 
 export function LoginPage() {
   const { login } = useAuth();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, guard] = useBusy();
 
-  async function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await login(name, password);
-      // Po wygaśnięciu sesji zostajemy na stronie, z której przyszedł użytkownik.
-      if (["/", "/login"].includes(currentPath())) navigate("/contracts");
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
+    void guard(async () => {
+      setError(null);
+      try {
+        await login(name, password);
+        // Po wygaśnięciu sesji zostajemy na stronie, z której przyszedł użytkownik.
+        if (["/", "/login"].includes(currentPath())) navigate("/contracts");
+      } catch (err) {
+        setError(errorMessage(err));
+      }
+    });
   }
 
   return (

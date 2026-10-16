@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ContractPage } from "../src/pages/ContractPage";
-import { mockFetch, problem } from "./helpers";
+import { deferred, json, mockFetch, problem } from "./helpers";
 
 const TEXT = "§ 1. Kary\nNajemca zapłaci karę umowną 600 zł za dzień.";
 const QUOTE = "zapłaci karę umowną 600 zł";
@@ -67,12 +67,12 @@ test("shows latest version and starts an analysis", async () => {
     { method: "POST", path: "/api/versions/11/analyses", status: 202, body: { analysis_id: 7 } },
     { path: "/api/versions/11", body: version([{ id: 7, status: "queued", started_at: "x" }]) },
     { path: "/api/analyses/7", body: REPORT },
-    { path: "/api/actions", body: [] },
+    { path: "/api/actions?analysis_id=7", body: [] },
   ]);
   render(<ContractPage contractId={3} />);
 
   expect(await screen.findByRole("heading", { name: "Najem lokalu" })).toBeInTheDocument();
-  expect(screen.getByText(/Wersja 2/)).toBeInTheDocument();
+  expect(await screen.findByTestId("loaded-version")).toHaveTextContent("Wersja 2");
   await userEvent.click(await screen.findByRole("button", { name: "Uruchom analizę" }));
 
   expect(await screen.findByText("Wysoka kara dzienna")).toBeInTheDocument();
@@ -102,10 +102,10 @@ test("requests an export for a finished analysis", async () => {
     { path: "/api/contracts/3", body: CONTRACT },
     { path: "/api/versions/11", body: version([{ id: 7, status: "done", started_at: "x" }]) },
     { path: "/api/analyses/7", body: REPORT },
-    { path: "/api/actions", body: [] },
+    { path: "/api/actions?analysis_id=7", body: [] },
     { method: "POST", path: "/api/analyses/7/actions", status: 201, body: { action_id: 4 } },
     {
-      path: "/api/actions",
+      path: "/api/actions?analysis_id=7",
       body: [
         {
           id: 4,
@@ -127,4 +127,61 @@ test("requests an export for a finished analysis", async () => {
   expect(await screen.findByText(/eksport — oczekuje/)).toBeInTheDocument();
   const post = fetch.mock.calls.find(([url]) => url === "/api/analyses/7/actions");
   expect(JSON.parse(String(post?.[1]?.body))).toEqual({ typ: "eksport" });
+});
+
+
+const QUARANTINED = {
+  ...REPORT,
+  status: "quarantined",
+  reason: "wstrzyknięcie",
+  findings: [],
+  quarantine: { action_id: 5, status: "oczekuje" },
+};
+const RELEASED = { ...REPORT, quarantine: { action_id: 5, status: "zatwierdzona" } };
+
+test("quarantine banner has refresh button that reloads analysis", async () => {
+  mockFetch([
+    { path: "/api/contracts/3", body: CONTRACT },
+    { path: "/api/versions/11", body: version([{ id: 7, status: "quarantined", started_at: "x" }]) },
+    { path: "/api/analyses/7", body: QUARANTINED },
+    { path: "/api/analyses/7", body: RELEASED },
+    { path: "/api/actions?analysis_id=7", body: [] },
+  ]);
+  render(<ContractPage contractId={3} />);
+  expect(await screen.findByText(/Analiza jest w kwarantannie/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Odśwież" }));
+  expect(await screen.findByText("Wysoka kara dzienna")).toBeInTheDocument();
+  expect(screen.queryByText(/Analiza jest w kwarantannie/)).not.toBeInTheDocument();
+});
+
+test("analysis error is announced", async () => {
+  mockFetch([
+    { path: "/api/contracts/3", body: CONTRACT },
+    { path: "/api/versions/11", body: version([{ id: 7, status: "done", started_at: "x" }]) },
+    { path: "/api/analyses/7", status: 404, body: problem(404, "Nie znaleziono analizy.", "r-1") },
+  ]);
+  render(<ContractPage contractId={3} />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Nie znaleziono analizy.");
+});
+
+test("second click while start is in flight is ignored", async () => {
+  const pending = deferred();
+  const routes = mockFetch([
+    { path: "/api/contracts/3", body: CONTRACT },
+    { path: "/api/versions/11", body: version() },
+    { path: "/api/versions/11", body: version([{ id: 7, status: "done", started_at: "x" }]) },
+    { path: "/api/analyses/7", body: REPORT },
+    { path: "/api/actions?analysis_id=7", body: [] },
+  ]);
+  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+    init?.method === "POST" ? pending.promise : routes(input, init),
+  );
+  vi.stubGlobal("fetch", fetch);
+  render(<ContractPage contractId={3} />);
+  const button = await screen.findByRole("button", { name: "Uruchom analizę" });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  pending.release(json(202, { analysis_id: 7 }));
+  expect(await screen.findByText("Wysoka kara dzienna")).toBeInTheDocument();
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
