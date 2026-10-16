@@ -18,6 +18,15 @@ updates:
         patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "typescript-eslint", "typescript"]
       react:
         patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+    ignore:
+      # Wstrzymane, dopóki eslint-plugin-react i typescript-eslint ich nie wspierają (npm ci → ERESOLVE,
+      # #20). Usuń wpis, gdy wtyczki wydadzą zgodne wersje.
+      - dependency-name: eslint
+        versions: ["10.x"]
+      - dependency-name: "@eslint/js"
+        versions: ["10.x"]
+      - dependency-name: typescript
+        versions: ["7.x"]
   - package-ecosystem: docker
     directories:
       - /backend
