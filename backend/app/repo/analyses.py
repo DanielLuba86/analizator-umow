@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.model import AnalysisStatus, Claim
 from app.domain.quotes import QuoteMatch, RejectReason
-from app.repo.models import Analysis, Contract, ContractVersion, Finding, RejectedClaim
+from app.repo.models import Analysis, Contract, ContractVersion, Finding, RejectedClaim, User
 
 FindingRow = Finding
 
@@ -25,6 +25,10 @@ TRANSITIONS: dict[str, frozenset[str]] = {
 
 class AnalysisAlreadyActive(Exception):
     """Dla wersji trwa już analiza (queued/running)."""
+
+
+class TooManyUserAnalyses(Exception):
+    """Użytkownik ma już limit trwających analiz (żeby jedna osoba nie zajęła wszystkich miejsc)."""
 
 
 class TooManyActiveAnalyses(Exception):
@@ -52,14 +56,37 @@ def count_active(s: Session) -> int:
     ).scalar_one()
 
 
+def count_active_by_user(s: Session, user_id: int) -> int:
+    return s.execute(
+        select(func.count())
+        .select_from(Analysis)
+        .where(Analysis.started_by == user_id, Analysis.status.in_(ACTIVE_STATUSES))
+    ).scalar_one()
+
+
 def create_analysis(
-    s: Session, version_id: int, started_by: int, model: str, *, max_active: int | None = None
+    s: Session,
+    version_id: int,
+    started_by: int,
+    model: str,
+    *,
+    max_active: int | None = None,
+    max_active_per_user: int | None = None,
 ) -> int:
+    # Kolejność blokad zawsze: wiersz wersji, potem wiersz użytkownika.
     s.execute(
         select(ContractVersion.id).where(ContractVersion.id == version_id).with_for_update()
     ).one()
     if active_analysis(s, version_id) is not None:
         raise AnalysisAlreadyActive
+    if max_active_per_user is not None:
+        # Limit użytkownika ścisły: blokada wiersza użytkownika szereguje jego równoległe starty.
+        # FOR NO KEY UPDATE nie koliduje z KEY SHARE z kluczy obcych do users.
+        s.execute(
+            select(User.id).where(User.id == started_by).with_for_update(key_share=True)
+        ).one()
+        if count_active_by_user(s, started_by) >= max_active_per_user:
+            raise TooManyUserAnalyses
     # Limit globalny bez blokady: równoległe starty różnych wersji mogą go przekroczyć
     # o kilka analiz — to ochrona kosztów, nie twardy przydział.
     if max_active is not None and count_active(s) >= max_active:

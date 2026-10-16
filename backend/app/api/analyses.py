@@ -17,7 +17,12 @@ from app.agent.sdk_runner import SdkAgentRunner
 from app.api.deps import DbDep, SettingsDep, UserDep, current_user, get_session_factory
 from app.api.errors import ApiError, request_id_of
 from app.repo import analyses, contracts
-from app.repo.analyses import AnalysisAlreadyActive, FindingRow, TooManyActiveAnalyses
+from app.repo.analyses import (
+    AnalysisAlreadyActive,
+    FindingRow,
+    TooManyActiveAnalyses,
+    TooManyUserAnalyses,
+)
 from app.repo.audit import audit
 from app.services.analysis import run_analysis
 from app.services.comparison import VersionsOfDifferentContracts, compare_versions
@@ -105,6 +110,15 @@ def analysis_not_found() -> ApiError:
     return ApiError(404, "nie_znaleziono_analizy", "Nie znaleziono analizy.")
 
 
+def analyses_word(n: int) -> str:
+    """Odmiana po liczebniku: 1 trwającą analizę, 2–4 trwające analizy, 5+ trwających analiz."""
+    if n == 1:
+        return "trwającą analizę"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return "trwające analizy"
+    return "trwających analiz"
+
+
 @router.post("/versions/{version_id}/analyses", status_code=202)
 def start_analysis(
     version_id: int,
@@ -121,11 +135,24 @@ def start_analysis(
         raise version_not_found()
     try:
         aid = analyses.create_analysis(
-            db, version_id, user.id, settings.agent_model, max_active=settings.max_active_analyses
+            db,
+            version_id,
+            user.id,
+            settings.agent_model,
+            max_active=settings.max_active_analyses,
+            max_active_per_user=settings.max_active_analyses_per_user,
         )
     except AnalysisAlreadyActive:
         db.rollback()
         raise ApiError(409, "analiza_w_toku", "Dla tej wersji trwa już analiza.") from None
+    except TooManyUserAnalyses:
+        db.rollback()
+        n = settings.max_active_analyses_per_user
+        raise ApiError(
+            429,
+            "za_duzo_analiz_uzytkownika",
+            f"Masz już {n} {analyses_word(n)}. Poczekaj, aż któraś się zakończy.",
+        ) from None
     except TooManyActiveAnalyses:
         db.rollback()
         raise ApiError(
