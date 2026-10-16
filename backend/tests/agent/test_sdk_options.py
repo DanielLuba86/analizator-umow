@@ -133,6 +133,8 @@ def test_agent_env_blanks_everything_but_allowlist(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("PATH", "/usr/bin")
     monkeypatch.setenv("HOME", "/home/app")
     monkeypatch.setenv("LANG", "C.UTF-8")
+    monkeypatch.setenv("https_proxy", "http://proxy:3128")  # obrazy Debiana: małe litery
+    monkeypatch.setenv("no_proxy", "localhost")
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:haslo@db/x")
     monkeypatch.setenv("SEED_LAWYER_PASSWORD", "haslo")
     monkeypatch.setenv("PGPASS", "haslo")  # nazwa bez PASSWORD/SECRET/TOKEN

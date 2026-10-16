@@ -59,6 +59,9 @@ ENV_ALLOWLIST = frozenset(
         "HTTP_PROXY",
         "HTTPS_PROXY",
         "NO_PROXY",
+        "http_proxy",  # wiele obrazów (Debian) ustawia proxy małymi literami
+        "https_proxy",
+        "no_proxy",
         "SSL_CERT_FILE",
         "SSL_CERT_DIR",
         "NODE_EXTRA_CA_CERTS",

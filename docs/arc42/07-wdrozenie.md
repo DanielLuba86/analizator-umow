@@ -60,7 +60,10 @@ Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](..
 - Brak TLS w compose. Produkcja wymaga reverse proxy z TLS i `COOKIE_SECURE=true`.
 - Backend nie jest wystawiony na hosta: jedynym wejściem jest nginx, który dodaje CSP i limity.
   Reverse proxy przed nginx musi przekazywać nagłówek `Host` bez zmian, bo backend porównuje
-  z nim nagłówek `Origin`.
+  z nim nagłówek `Origin`. Musi też ustawiać `X-Forwarded-For`, a w
+  [`frontend/nginx.conf`](../../frontend/nginx.conf) trzeba odkomentować `set_real_ip_from`
+  (sieć proxy) i `real_ip_header`. Bez tego limit logowania liczy adres proxy i wszyscy
+  użytkownicy dzielą jeden limit 10 prób na minutę.
 - Obrazy bazowe są przypięte (`uv` po wersji i digeście, `nginx-unprivileged` po digeście);
   aktualizacje proponuje Dependabot.
 - CI (GitHub Actions) uruchamia testy backendu z PostgreSQL jako service container.

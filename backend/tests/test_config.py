@@ -37,3 +37,12 @@ def test_settings_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
         False,
         2,
     )
+
+
+def test_empty_env_values_mean_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """.env.example ma `ANTHROPIC_API_KEY=` — pusty klucz to brak klucza, nie klucz ''."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("SEED_LAWYER_PASSWORD", "")
+    s = Settings(database_url=URL)
+    assert s.anthropic_api_key is None
+    assert s.seed_lawyer_password is None
