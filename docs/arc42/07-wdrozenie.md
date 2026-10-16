@@ -43,7 +43,7 @@ Migracje muszą poprzedzać start aplikacji, bo przy starcie oznacza ona przerwa
 Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](../../.env.example)):
 
 - połączenie z bazą;
-- klucz Anthropic;
+- dostawca modelu (`LLM_PROVIDER`: Claude API albo Microsoft Foundry) i jego dane logowania;
 - modele;
 - limity agenta;
 - maksymalna długość umowy i rozmiar ciała żądania;

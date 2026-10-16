@@ -19,11 +19,12 @@ prawnych.
 ## Wymagania
 
 - Docker z Docker Compose v2.
-- Klucz API Anthropic (`ANTHROPIC_API_KEY`). Bez klucza aplikacja działa, ale każda analiza kończy
-  się kwarantanną (klasyfikator niedostępny).
+- Dostęp do modeli Claude: klucz Claude API (`ANTHROPIC_API_KEY`) albo zasób Microsoft Foundry
+  (sekcja [Microsoft Foundry](#microsoft-foundry)). Bez niego aplikacja działa, ale każda analiza
+  kończy się kwarantanną (klasyfikator niedostępny).
 - Do testów lokalnych (opcjonalnie):
   - [uv](https://docs.astral.sh/uv/) z Pythonem 3.14;
-  - Node.js 22.
+  - Node.js 24.
 
 ## Uruchomienie od zera
 
@@ -35,7 +36,7 @@ cp .env.example .env
 
 Uzupełnij w `.env`:
 
-- `ANTHROPIC_API_KEY` — klucz API;
+- `ANTHROPIC_API_KEY` — klucz Claude API (albo ustawienia Foundry, sekcja niżej);
 - `SEED_ASSISTANT_PASSWORD` i `SEED_LAWYER_PASSWORD` — hasła kont demo; puste hasło oznacza,
   że konto nie zostanie utworzone;
 - `POSTGRES_PASSWORD` — zmień, i zmień tak samo w `DATABASE_URL`.
@@ -56,6 +57,31 @@ CSP, ogranicza rozmiar żądania i liczbę prób logowania (10 na minutę z jedn
 Za TLS (HTTPS) ustaw w `.env` `COOKIE_SECURE=true`, żeby przeglądarka wysyłała cookie sesji
 tylko szyfrowanym połączeniem. Lokalnie, przez zwykłe HTTP, zostaw `false` — inaczej logowanie
 nie zadziała.
+
+### Microsoft Foundry
+
+Zamiast Claude API aplikacja może korzystać z modeli Claude wdrożonych w Microsoft Foundry (Azure).
+Koszt rozlicza Microsoft, według stawek Claude API.
+
+1. W portalu Foundry utwórz zasób i dwa wdrożenia (deploymenty) o nazwach **dokładnie takich jak
+   modele**: `claude-opus-5-5` (agent) i `claude-haiku-5-5` (klasyfikator). Inne nazwy psują
+   szacowanie kosztu w Agent SDK, a z nim limit `AGENT_MAX_BUDGET_USD`.
+2. Z sekcji „Endpoints and keys” skopiuj klucz i nazwę zasobu (część adresu przed
+   `.services.ai.azure.com`).
+3. W `.env` ustaw:
+
+   ```
+   LLM_PROVIDER=foundry
+   ANTHROPIC_FOUNDRY_API_KEY=<klucz>
+   ANTHROPIC_FOUNDRY_RESOURCE=<nazwa-zasobu>
+   ```
+
+   `ANTHROPIC_API_KEY` może zostać pusty. Przy `foundry` agent go i tak nie dostaje.
+
+Błędna nazwa zasobu nie zatrzymuje startu, jeśli ma poprawny format, ale analiza czeka wtedy na
+odpowiedź aż do `AGENT_TIMEOUT_S` i kończy się statusem „przekroczony budżet” (`timeout`), a
+klasyfikator — kwarantanną. Nazwa w złym formacie (np. URL) zatrzymuje start backendu z błędem
+konfiguracji. Decyzję opisuje [ADR 0009](docs/adr/0009-dostawca-modelu-jako-ustawienie.md).
 
 ### Konta demo
 
