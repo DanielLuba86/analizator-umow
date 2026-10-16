@@ -1,6 +1,6 @@
 """Weryfikator dosłownych cytatów: twierdzenie agenta musi mieć pokrycie w tekście."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -13,7 +13,8 @@ RejectReason = Literal["brak_dosłownego_cytatu", "zły_fragment", "za_krótki_c
 # Wszystkie poniższe znaki są też białymi znakami wg str.isspace(); lista jawna dla czytelności.
 EXTRA_WHITESPACE = frozenset({" ", " ", " "})
 
-_HINTS: dict[str, str] = {
+# limit_tez nie ma podpowiedzi tutaj: zgłasza go narzędzie agenta, nie weryfikator cytatów.
+_HINTS: Mapping[RejectReason, str] = {
     "brak_dosłownego_cytatu": (
         "Cytat musi występować dosłownie we wskazanym fragmencie, łącznie z interpunkcją "
         "i znacznikami formatowania. Przeczytaj fragment ponownie narzędziem read_fragment "
@@ -87,6 +88,8 @@ def verify_quote(
 
     Dopuszczalna różnica: wyłącznie białe znaki. Przesunięcia są bezwzględne (w `text`).
     """
+    if min_len < 0:
+        raise ValueError("min_len nie może być ujemne")
     fragment = next((f for f in fragments if f.id == fragment_id), None)
     if fragment is None:
         raise QuoteNotFound("zły_fragment", _HINTS["zły_fragment"])
