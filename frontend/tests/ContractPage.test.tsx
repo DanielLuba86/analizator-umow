@@ -128,6 +128,38 @@ test("requests an export for a finished analysis", async () => {
   expect(await screen.findByText(/eksport — oczekuje/)).toBeInTheDocument();
   const post = fetch.mock.calls.find(([url]) => url === "/api/analyses/7/actions");
   expect(JSON.parse(String(post?.[1]?.body))).toEqual({ typ: "eksport" });
+  expect(screen.queryByRole("link", { name: /Pobierz/ })).not.toBeInTheDocument();
+});
+
+test("approved export offers JSON and PDF downloads", async () => {
+  mockFetch([
+    { path: "/api/contracts/3", body: CONTRACT },
+    { path: "/api/versions/11", body: version([{ id: 7, status: "done", started_at: "x" }]) },
+    { path: "/api/analyses/7", body: REPORT },
+    {
+      path: "/api/actions?analysis_id=7",
+      body: [
+        {
+          id: 4,
+          typ: "eksport",
+          analysis_id: 7,
+          status: "zatwierdzona",
+          payload: { zrodlo: "uzytkownik" },
+          created_at: "2026-10-15T12:00:00+00:00",
+          decided_by: 2,
+          decided_at: "2026-10-15T13:00:00+00:00",
+          export_id: 9,
+        },
+      ],
+    },
+  ]);
+  render(<ContractPage contractId={3} />);
+
+  const json = await screen.findByRole("link", { name: "Pobierz eksport (JSON)" });
+  expect(json).toHaveAttribute("href", "/api/exports/9");
+  const pdf = screen.getByRole("link", { name: "Pobierz PDF" });
+  expect(pdf).toHaveAttribute("href", "/api/exports/9/pdf");
+  expect(pdf).toHaveAttribute("download");
 });
 
 

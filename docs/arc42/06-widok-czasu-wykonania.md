@@ -80,7 +80,7 @@ Skutki zatwierdzenia:
 | `kwarantanna` | raport staje się widoczny (status `done`) |
 | `opinia` | analiza oznaczona jako oficjalna opinia kancelarii |
 | `wzorzec` | nowa wersja klauzuli w bazie wzorców; treść pisze prawnik w decyzji |
-| `eksport` | plik JSON raportu do pobrania pod `/api/exports/{id}` |
+| `eksport` | raport do pobrania jako JSON (`/api/exports/{id}`) albo PDF dla klienta (`/api/exports/{id}/pdf`) |
 
 ## Scenariusz 3: porównanie wersji
 

@@ -1,4 +1,6 @@
 # ruff: noqa: S106
+import re
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -6,6 +8,7 @@ import pytest
 from api_helpers import ApiClientFactory, make_settings
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pypdf import PdfReader
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -25,6 +28,7 @@ TEXT = (
 )
 QUOTE = "zapłaci karę umowną w wysokości 600 zł"
 FABRICATED = "Najemca może wypowiedzieć umowę bez kary w każdym czasie"
+FIRM = "Kancelaria Próbna Sp. k."
 SCRIPT = [
     ToolCall(
         "submit_finding",
@@ -43,7 +47,7 @@ SCRIPT = [
 
 @pytest.fixture
 def settings() -> Settings:
-    return make_settings(max_contract_chars=200_000)
+    return make_settings(max_contract_chars=200_000, report_firm_name=FIRM)
 
 
 @pytest.fixture(autouse=True)
@@ -374,3 +378,36 @@ def test_approved_quarantine_of_interrupted_agent_stays_incomplete(
 def test_finished_agent_report_is_complete(assistant: TestClient) -> None:
     rep = assistant.get(f"/api/analyses/{analysis(assistant)}").json()
     assert (rep["status"], rep["incomplete"], rep["agent_reason"]) == ("done", False, None)
+
+
+def pdf_text(pdf: bytes) -> str:
+    return " ".join(" ".join(p.extract_text() or "" for p in PdfReader(BytesIO(pdf)).pages).split())
+
+
+def test_export_pdf_draft(assistant: TestClient, lawyer: TestClient, anon: TestClient) -> None:
+    aid = analysis(assistant)
+    export_id = decide(lawyer, request(assistant, aid, "eksport"), True).json()["export_id"]
+    r = assistant.get(f"/api/exports/{export_id}/pdf")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.headers["content-disposition"] == f'attachment; filename="raport-analizy-{aid}.pdf"'
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["cache-control"] == "no-store"
+    t = pdf_text(r.content)
+    assert FIRM in t and QUOTE in t and "WERSJA ROBOCZA" in t
+    assert FABRICATED not in t
+    assert anon.get(f"/api/exports/{export_id}/pdf").status_code == 401
+    missing = assistant.get("/api/exports/999999/pdf")
+    assert missing.status_code == 404
+    assert missing.json()["type"] == "/problems/nie_znaleziono_eksportu"
+
+
+def test_export_pdf_of_official_opinion_names_lawyer(
+    assistant: TestClient, lawyer: TestClient
+) -> None:
+    aid = analysis(assistant)
+    assert decide(lawyer, request(assistant, aid, "opinia"), True).status_code == 200
+    export_id = decide(lawyer, request(assistant, aid, "eksport"), True).json()["export_id"]
+    t = pdf_text(assistant.get(f"/api/exports/{export_id}/pdf").content)
+    assert re.search(r"Opinia zatwierdzona przez prawnika: prawnik-\d+", t)
+    assert "WERSJA ROBOCZA" not in t

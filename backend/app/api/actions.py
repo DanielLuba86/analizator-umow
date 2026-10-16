@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.api.deps import DbDep, SettingsDep, UserDep, current_user, require_role
 from app.api.errors import ApiError
 from app.domain.model import ActionStatus
-from app.repo import actions, analyses, exports
+from app.repo import actions, analyses, exports, users
 from app.repo.actions import ActionAlreadyDecided
 from app.security.sessions import UserRow
 from app.services import actions as actions_service
@@ -20,6 +20,7 @@ from app.services.actions import (
     TemplateRequired,
     UserActionType,
 )
+from app.services.pdf_report import render_report
 
 router = APIRouter(prefix="/api", tags=["actions"], dependencies=[Depends(current_user)])
 
@@ -164,17 +165,39 @@ def decide_action(
     return DecisionOut(id=action_id, status=result.status, export_id=result.export_id)
 
 
-@router.get("/exports/{export_id}")
-def get_export(export_id: int, db: DbDep) -> Response:
+def _export_or_404(db: DbDep, export_id: int) -> exports.ExportRow:
     e = exports.get_export(db, export_id)
     if e is None:
         raise ApiError(404, "nie_znaleziono_eksportu", "Nie znaleziono eksportu.")
+    return e
+
+
+def _download(content: bytes | str, media_type: str, filename: str) -> Response:
     return Response(
-        content=json.dumps(e.content, ensure_ascii=False, indent=2),
-        media_type="application/json",
+        content=content,
+        media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="raport-analizy-{e.analysis_id}.json"',
+            "Content-Disposition": f'attachment; filename="{filename}"',
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "no-store",
         },
     )
+
+
+@router.get("/exports/{export_id}")
+def get_export(export_id: int, db: DbDep) -> Response:
+    e = _export_or_404(db, export_id)
+    return _download(
+        json.dumps(e.content, ensure_ascii=False, indent=2),
+        "application/json",
+        f"raport-analizy-{e.analysis_id}.json",
+    )
+
+
+@router.get("/exports/{export_id}/pdf")
+def get_export_pdf(export_id: int, db: DbDep, settings: SettingsDep) -> Response:
+    """Raport dla klienta z tej samej zamrożonej treści co JSON (bez osobnego wniosku)."""
+    e = _export_or_404(db, export_id)
+    approver = users.get_login(db, e.content["approved_by"])
+    pdf = render_report(e.content, approver=approver, firm_name=settings.report_firm_name)
+    return _download(pdf, "application/pdf", f"raport-analizy-{e.analysis_id}.pdf")

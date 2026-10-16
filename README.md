@@ -166,6 +166,10 @@ docker compose run --rm -v "$PWD/scripts:/scripts:ro" -v "$PWD/data:/data:ro" \
 - **Cytaty weryfikowane kodem.** Teza bez dosłownego cytatu jest odrzucana i nie trafia do raportu.
 - **Człowiek w pętli.** Oficjalna opinia, zmiana wzorca, eksport i zwolnienie z kwarantanny
   wymagają zatwierdzenia przez prawnika. Każda decyzja trafia do dziennika audytu.
+- **Eksport dla klienta.** Zatwierdzony eksport można pobrać jako JSON albo PDF. PDF ma nagłówek
+  kancelarii (`REPORT_FIRM_NAME`), a raport, który nie jest oficjalną opinią, dostaje baner
+  „WERSJA ROBOCZA – dokument nie stanowi opinii prawnej”. Tezy i cytaty trafiają do PDF jako
+  zwykły tekst.
 - **Limity.** Liczba kroków, budżet, czas i liczba tez na analizę są konfigurowane w `.env`.
 - **Brak wycieku.**
   - Treść umów nie trafia do logów ani komunikatów błędów.
