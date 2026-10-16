@@ -45,7 +45,7 @@ def _banner(pdf: FPDF, text: str, rgb: tuple[int, int, int]) -> None:
     pdf.set_text_color(255, 255, 255)
     pdf.set_font(_FONT, "B", 10)
     pdf.multi_cell(
-        0, 5.5, text, fill=True, align="C", padding=2.5, new_x=XPos.LMARGIN, new_y=YPos.NEXT
+        0, 5.5, text, fill=True, align="C", padding=3, new_x=XPos.LMARGIN, new_y=YPos.NEXT
     )
     pdf.set_text_color(0, 0, 0)
     pdf.ln(3)
