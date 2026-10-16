@@ -37,14 +37,15 @@ def search_templates(s: Session, kind: str, query: str, limit: int = 5) -> list[
 
 
 def add_template_version(s: Session, kind: str, name: str, text: str) -> int:
-    wersja = (
-        s.scalar(
-            select(func.coalesce(func.max(Template.wersja), 0)).where(
-                Template.kind == kind, Template.nazwa_klauzuli == name
-            )
+    # Nie ma wiersza nadrzędnego do zablokowania (pierwsza wersja też musi czekać),
+    # więc blokada doradcza na (rodzaj, nazwa) do końca transakcji szereguje max + 1.
+    s.execute(select(func.pg_advisory_xact_lock(func.hashtext(kind), func.hashtext(name))))
+    current: int = s.execute(
+        select(func.coalesce(func.max(Template.wersja), 0)).where(
+            Template.kind == kind, Template.nazwa_klauzuli == name
         )
-        or 0
-    ) + 1
+    ).scalar_one()
+    wersja = current + 1
     t = Template(kind=kind, nazwa_klauzuli=name, tresc=text, wersja=wersja)
     s.add(t)
     s.flush()

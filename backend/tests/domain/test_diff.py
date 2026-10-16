@@ -1,3 +1,5 @@
+import pytest
+
 from app.domain.diff import FindingKey, FragmentChange, diff_findings, diff_fragments
 
 
@@ -40,3 +42,10 @@ def test_findings_whitespace_in_cytat_is_not_a_change() -> None:
         [FindingKey("kara", "§ 5", "kara  umowna 10%")],
         [FindingKey("kara", "§ 5", "kara umowna 10%")],
     ) == {"nowe": [], "ustąpiło": []}
+
+
+def test_diff_fragments_duplicate_labels_rejected() -> None:
+    with pytest.raises(ValueError, match="etykiet"):
+        diff_fragments([("§ 1", "a"), ("§ 1", "b")], [("§ 1", "a")])
+    with pytest.raises(ValueError, match="etykiet"):
+        diff_fragments([("§ 1", "a")], [("§ 1", "a"), ("§ 1", "b")])

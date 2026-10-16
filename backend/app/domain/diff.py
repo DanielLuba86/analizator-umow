@@ -8,7 +8,8 @@ from app.domain.quotes import normalize_whitespace
 
 
 def _norm(s: str) -> str:
-    return normalize_whitespace(s)[0].strip()
+    normalized, _, _ = normalize_whitespace(s)
+    return normalized.strip()
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,14 @@ class FragmentChange:
 def diff_fragments(
     old: Sequence[tuple[str, str]], new: Sequence[tuple[str, str]]
 ) -> list[FragmentChange]:
-    """Porównuje po etykiecie; kolejność: etykiety z `new`, potem usunięte (kolejność z `old`)."""
+    """Porównuje po etykiecie; kolejność: etykiety z `new`, potem usunięte (kolejność z `old`).
+
+    Etykiety w wersji są unikalne (segmentacja dokleja „(2)”, „(3)”); duplikat to błąd wywołującego.
+    """
+    for side in (old, new):
+        labels = [label for label, _ in side]
+        if len(labels) != len(set(labels)):
+            raise ValueError("powtórzone etykiety fragmentów")
     old_by_label = dict(old)
     new_labels = {label for label, _ in new}
     changes: list[FragmentChange] = []

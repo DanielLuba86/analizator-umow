@@ -42,7 +42,7 @@ _COMMAND_PHRASES = re.compile(
             r"(?:bezpieczną|niskiego\s+ryzyka)",
             r"nie\s+(?:zgłaszaj|raportuj|oznaczaj)",
             r"system\s+prompt",
-            r"(?<!\bif )you\s+are\s+now\b",
+            r"you\s+are\s+now\b",  # poza „if you are now” (warunek umowny) — _after_if
         ]
     )
     + r")\b",
@@ -82,8 +82,19 @@ def _scripts(word: str) -> set[str]:
     return found
 
 
+_IF_BEFORE = re.compile(r"\bif[\s,]*$", _FLAGS)
+_IF_LOOKBACK = 20
+
+
+def _after_if(text: str, start: int) -> bool:
+    """„if you are now…” to zwrot warunkowy w umowach anglojęzycznych, nie polecenie."""
+    return _IF_BEFORE.search(text[max(0, start - _IF_LOOKBACK) : start]) is not None
+
+
 def _raw_spans(text: str) -> Iterator[tuple[InjectionRule, int, int]]:
     for m in _COMMAND_PHRASES.finditer(text):
+        if m.group().lower().startswith("you") and _after_if(text, m.start()):
+            continue
         yield "fraza_rozkazowa", m.start(), m.end()
     for m in _ZERO_WIDTH.finditer(text):
         yield "zero_width", m.start(), m.end()
@@ -159,8 +170,11 @@ def scan_heuristics(text: str, fragments: Sequence[Fragment]) -> list[InjectionH
     """Zwraca trafienia heurystyk posortowane po początku, potem po nazwie reguły."""
     hits: list[InjectionHit] = []
     cache: dict[str, _Normalized] = {}
+    ordered = sorted(fragments, key=lambda f: f.start)
+    starts = [f.start for f in ordered]
     for rule, raw_start, raw_end in _raw_spans(text):
-        fragment = next((f for f in fragments if f.start <= raw_start < f.end), None)
+        i = bisect_right(starts, raw_start) - 1
+        fragment = ordered[i] if i >= 0 and raw_start < ordered[i].end else None
         if fragment is None:
             continue
         norm = cache.get(fragment.id)

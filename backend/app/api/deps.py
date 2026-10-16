@@ -1,5 +1,6 @@
 """Zależności API: ustawienia, sesja bazy, zalogowany użytkownik, wymagana rola."""
 
+import threading
 from collections.abc import Callable, Iterator
 from typing import Annotated
 
@@ -22,13 +23,23 @@ def get_app_settings() -> Settings:
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 
 
+_engine_lock = threading.Lock()
+
+
 def get_session_factory(request: Request, settings: SettingsDep) -> sessionmaker[Session]:
-    """Silnik tworzony leniwie przy pierwszym żądaniu i trzymany w stanie aplikacji."""
+    """Silnik tworzony leniwie przy pierwszym żądaniu i trzymany w stanie aplikacji.
+
+    Zależności synchroniczne biegną w puli wątków, więc tworzenie jest pod blokadą.
+    """
     sf: sessionmaker[Session] | None = getattr(request.app.state, "session_factory", None)
-    if sf is None:
-        engine = make_engine(settings.database_url)
-        request.app.state.engine = engine
-        sf = request.app.state.session_factory = session_factory(engine)
+    if sf is not None:
+        return sf
+    with _engine_lock:
+        sf = getattr(request.app.state, "session_factory", None)
+        if sf is None:
+            engine = make_engine(settings.database_url)
+            request.app.state.engine = engine
+            sf = request.app.state.session_factory = session_factory(engine)
     return sf
 
 
@@ -41,17 +52,19 @@ def get_db(
 
 DbDep = Annotated[Session, Depends(get_db)]
 
-UNAUTHORIZED = ApiError(401, "brak_logowania", "Wymagane zalogowanie.")
+
+def unauthorized() -> ApiError:
+    return ApiError(401, "brak_logowania", "Wymagane zalogowanie.")
 
 
 def current_user(request: Request, db: DbDep) -> UserRow:
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
-        raise UNAUTHORIZED
+        raise unauthorized()
     user = resolve_session(db, token)
     db.commit()  # resolve_session usuwa wygasłe sesje
     if user is None:
-        raise UNAUTHORIZED
+        raise unauthorized()
     return user
 
 

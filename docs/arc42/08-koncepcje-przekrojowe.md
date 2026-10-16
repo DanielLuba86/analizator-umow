@@ -10,10 +10,10 @@ musi być doskonała. Szczegółowe zagrożenia, obrony i testy są w
 |---|---|---|
 | 1. Detekcja przed agentem | Heurystyki: frazy rozkazowe do AI, zero-width i bidi, homoglify, pseudo-znaczniki, bloki base64. Do tego klasyfikator Claude bez narzędzi, z odpowiedzią w schemacie JSON. Każde trafienie ma zweryfikowany cytat. | [`domain/injection.py`](../../backend/app/domain/injection.py), [`agent/classifier.py`](../../backend/app/agent/classifier.py) |
 | 2. Spotlighting | Treść tylko przez `read_fragment`, w `<untrusted_contract_fragment>`; znaczniki z treści neutralizowane; prompt deklaruje zawartość jako dane i nie zawiera treści umowy. | [`agent/tools.py`](../../backend/app/agent/tools.py), [`agent/prompt.py`](../../backend/app/agent/prompt.py) |
-| 3. Najmniejsze uprawnienia | Wbudowane narzędzia SDK wyłączone; tylko 5 własnych narzędzi; zestaw narzędzi sprawdzany przy starcie (fail closed); `analysis_id`/`version_id` z kontekstu serwera; zmienne środowiskowe z sekretami serwera (wg wzorców nazw) wyczyszczone w procesie agenta. | [`agent/sdk_runner.py`](../../backend/app/agent/sdk_runner.py), [`agent/context.py`](../../backend/app/agent/context.py) |
+| 3. Najmniejsze uprawnienia | Wbudowane narzędzia SDK wyłączone; tylko 5 własnych narzędzi; zestaw narzędzi sprawdzany przy starcie (fail closed); `analysis_id`/`version_id` z kontekstu serwera; w procesie agenta zostają tylko zmienne z listy dozwolonych (ścieżki, locale, proxy, certyfikaty CA) i klucz API. | [`agent/sdk_runner.py`](../../backend/app/agent/sdk_runner.py), [`agent/context.py`](../../backend/app/agent/context.py) |
 | 4. Weryfikacja cytatów | Teza przyjęta tylko z dosłownym cytatem (po normalizacji białych znaków, min. 12 znaków) we wskazanym fragmencie. | [`domain/quotes.py`](../../backend/app/domain/quotes.py) |
 | 5. Człowiek w pętli | Opinia, wzorzec, eksport i zwolnienie z kwarantanny tylko jako wnioski zatwierdzane przez prawnika. | [`services/actions.py`](../../backend/app/services/actions.py) |
-| 6. Limity | `AGENT_MAX_TURNS=30`, `AGENT_MAX_BUDGET_USD=0.50`, `AGENT_MAX_FINDINGS=60`, `AGENT_TIMEOUT_S=300` → `budget_exceeded` z tezami oznaczonymi jako niepełne. | [`agent/guard.py`](../../backend/app/agent/guard.py) |
+| 6. Limity | `AGENT_MAX_TURNS=30`, `AGENT_MAX_BUDGET_USD=0.50`, `AGENT_MAX_FINDINGS=60`, `AGENT_TIMEOUT_S=300` → `budget_exceeded` z tezami oznaczonymi jako niepełne; najwyżej `MAX_ACTIVE_ANALYSES=5` analiz naraz → 429. | [`agent/guard.py`](../../backend/app/agent/guard.py), [`repo/analyses.py`](../../backend/app/repo/analyses.py) |
 | 7. Brak wycieku | Redakcja logów; eksport tylko po zatwierdzeniu; frontend renderuje tekst jako tekst, CSP; sekrety tylko w `.env`, gitleaks w CI. | [`security/logging.py`](../../backend/app/security/logging.py), [`frontend/nginx.conf`](../../frontend/nginx.conf) |
 
 ## Uwierzytelnianie i autoryzacja
@@ -23,7 +23,10 @@ musi być doskonała. Szczegółowe zagrożenia, obrony i testy są w
   mierzą testy.
 - Sesja jest przechowywana po stronie serwera, w bazie tylko jako hash SHA-256 tokenu.
   W przeglądarce token leży w ciasteczku `sid` (`HttpOnly`, `SameSite=Strict`, `Path=/api`,
-  `Secure` z ustawień).
+  `Secure` z ustawień). Wygasłe sesje są usuwane przy każdym logowaniu.
+- Obrona w głąb przed CSRF: żądania `POST`/`PUT`/`PATCH`/`DELETE` z nagłówkiem `Origin` innej
+  witryny dostają 403 ([`api/middleware.py`](../../backend/app/api/middleware.py)). Logowanie
+  ogranicza nginx: 10 prób na minutę z jednego adresu IP.
 - Są dwie role: `asystent` i `prawnik`. Decyzje o wnioskach wymagają roli `prawnik`
   (`require_role`), w pozostałych przypadkach API zwraca 403.
 - Brak podziału umów między użytkowników: jedna kancelaria.

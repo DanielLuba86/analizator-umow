@@ -70,8 +70,12 @@ def get_action(s: Session, action_id: int) -> ActionRow | None:
     return s.get(PendingAction, action_id)
 
 
-def list_actions(s: Session, status: ActionStatus | None = None) -> list[ActionRow]:
+def list_actions(
+    s: Session, status: ActionStatus | None = None, analysis_id: int | None = None
+) -> list[ActionRow]:
     stmt = select(PendingAction).order_by(PendingAction.id)
     if status is not None:
         stmt = stmt.where(PendingAction.status == status)
+    if analysis_id is not None:
+        stmt = stmt.where(PendingAction.analysis_id == analysis_id)
     return list(s.scalars(stmt))

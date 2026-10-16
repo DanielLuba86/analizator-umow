@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 import structlog
+import structlog.contextvars
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agent.classifier import ClassifierUnavailable, InjectionClassifier
@@ -113,6 +114,8 @@ def _finalize(
     )
     turns = outcome.turns if outcome else None
     cost = outcome.cost_usd if outcome else None
+    if outcome is not None:
+        analyses.set_agent_reason(s, analysis_id, outcome.reason)
     if quarantine is not None:
         actions.request_action(s, analysis_id, "kwarantanna", {"powód": quarantine})
         analyses.set_status(
@@ -134,13 +137,37 @@ async def run_analysis(
     runner: AgentRunner,
     classifier: InjectionClassifier,
     settings: Settings,
+    request_id: str | None = None,
 ) -> None:
+    """Analiza w tle; logi niosą request_id żądania, które ją uruchomiło."""
+    with structlog.contextvars.bound_contextvars(request_id=request_id):
+        await _run_analysis(
+            analysis_id,
+            session_factory=session_factory,
+            runner=runner,
+            classifier=classifier,
+            settings=settings,
+        )
+
+
+async def _run_analysis(
+    analysis_id: int,
+    *,
+    session_factory: sessionmaker[Session],
+    runner: AgentRunner,
+    classifier: InjectionClassifier,
+    settings: Settings,
+) -> None:
+    with session_factory() as s:
+        claimed = analyses.claim_analysis(s, analysis_id)
+        s.commit()
+    if not claimed:  # ponowne wywołanie: analizę już uruchomiono, nie powielamy tez
+        log.warning("analysis_already_started", analysis_id=analysis_id)
+        return
     classifier_unavailable = False
     try:
         with session_factory() as s:
             version_id, kind = analyses.analysis_target(s, analysis_id)
-            analyses.set_status(s, analysis_id, "running")
-            s.commit()
         ctx = AnalysisContext(analysis_id, version_id, kind, settings.agent_max_findings)
 
         _, classifier_unavailable = await _detect(

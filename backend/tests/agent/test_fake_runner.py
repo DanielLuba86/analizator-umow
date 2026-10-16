@@ -99,3 +99,26 @@ async def test_unknown_tool_is_failed(env: Env) -> None:
     tools = env.tools()
     out = await runner([ToolCall("rm_rf", {})]).run(tools.ctx, tools)
     assert out.status == "failed"
+
+
+async def test_fake_runner_tool_timeout_is_failure_not_budget() -> None:
+    class Raises:
+        async def list_fragments(self) -> dict[str, Any]:
+            raise TimeoutError
+
+    out = await runner([ToolCall("list_fragments", {})]).run(
+        cast(Any, None), cast(AgentTools, Raises())
+    )
+    assert (out.status, out.reason) == ("failed", "TimeoutError")
+
+
+async def test_unknown_tool_does_not_consume_turn(env: Env) -> None:
+    tools = env.tools()
+    out = await runner([ToolCall("rm_rf", {})]).run(tools.ctx, tools)
+    assert (out.status, out.reason, out.turns) == ("failed", "LookupError", 0)
+
+
+async def test_mismatched_tool_args_fail_with_type_error(env: Env) -> None:
+    tools = env.tools()
+    out = await runner([ToolCall("list_fragments", {"nieznany": 1})]).run(tools.ctx, tools)
+    assert (out.status, out.reason) == ("failed", "TypeError")

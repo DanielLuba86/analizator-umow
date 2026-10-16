@@ -1,14 +1,19 @@
 """Narzędzia agenta: jedyny kanał, którym agent działa. Logika niezależna od SDK.
 
 Każda metoda to jedna transakcja (commit przy sukcesie). Narzędzia logują wyłącznie
-nazwę, wynik i identyfikatory — nigdy argumentów ani treści umowy.
+nazwę, wynik i identyfikatory — nigdy argumentów ani treści umowy. Praca z bazą jest
+synchroniczna, więc metody publiczne wykonują ją w wątku (asyncio.to_thread), żeby nie
+blokować pętli zdarzeń serwera, w której biegnie analiza w tle.
 """
 
+import asyncio
 import json
 import re
 from typing import Any, cast
 
+import psycopg
 import structlog
+from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -16,9 +21,18 @@ from app.agent.context import AnalysisContext
 from app.domain.fragments import MAX_FRAGMENT_ID_LEN, fragment_text
 from app.domain.model import CONTRACT_KINDS, ActionType, Claim, ClaimInvalid, validate_claim
 from app.domain.quotes import QuoteNotFound, verify_quote
-from app.repo import actions, analyses, contracts, templates
+from app.repo import actions, analyses, contracts, models, templates
 
 ToolResult = dict[str, Any]
+
+# Jedyne źródło nazw narzędzi (runner skryptowy i runner SDK).
+TOOL_NAMES: tuple[str, ...] = (
+    "list_fragments",
+    "read_fragment",
+    "search_templates",
+    "submit_finding",
+    "request_action",
+)
 
 TAG = "untrusted_contract_fragment"
 _TAG_OPEN_OR_CLOSE = re.compile(rf"<(/?)({TAG})", re.IGNORECASE)
@@ -75,13 +89,13 @@ class AgentTools:
             **ids,
         )
 
-    async def list_fragments(self) -> ToolResult:
+    def _list_fragments(self) -> ToolResult:
         with self._sf() as s:
             frags = contracts.list_fragments(s, self.ctx.version_id)
         self._log("list_fragments", "ok")
         return _json([{"id": f.id, "label": f.label, "length": f.end - f.start} for f in frags])
 
-    async def read_fragment(self, fragment_id: str) -> ToolResult:
+    def _read_fragment(self, fragment_id: str) -> ToolResult:
         if not isinstance(fragment_id, str):
             self._log("read_fragment", "invalid_input")
             return _error("Identyfikator fragmentu musi być tekstem.")
@@ -101,7 +115,7 @@ class AgentTools:
         self._log("read_fragment", "ok", fragment_id=frag.id)
         return _result(wrap_fragment(frag.id, frag.label, text))
 
-    async def search_templates(self, kind: str, query: str) -> ToolResult:
+    def _search_templates(self, kind: str, query: str) -> ToolResult:
         if not isinstance(kind, str) or not isinstance(query, str):
             self._log("search_templates", "invalid_input")
             return _error("Argumenty kind i query muszą być tekstem.")
@@ -123,7 +137,7 @@ class AgentTools:
         self._log("search_templates", "ok", count=len(data))
         return _json(data)
 
-    async def submit_finding(
+    def _submit_finding(
         self,
         typ: str,
         teza: str,
@@ -153,6 +167,11 @@ class AgentTools:
         )
         aid = self.ctx.analysis_id
         with self._sf() as s:
+            # Blokada wiersza analizy do commitu: liczenie i zapis tezy są atomowe względem
+            # równoległych wywołań (limit tez nie da się przekroczyć wyścigiem).
+            s.execute(
+                select(models.Analysis.id).where(models.Analysis.id == aid).with_for_update()
+            ).one()
             over_limit = analyses.count_findings(s, aid) >= self.ctx.max_findings
             try:
                 validate_claim(claim)
@@ -176,10 +195,13 @@ class AgentTools:
             try:
                 analyses.add_finding(s, aid, claim, match)
                 s.commit()
-            except IntegrityError:
+            except IntegrityError as e:
                 s.rollback()
-                self._log("submit_finding", "invalid_template")
-                return _error(_TEMPLATE_HINT)
+                if isinstance(e.orig, psycopg.errors.ForeignKeyViolation):  # tylko template_id
+                    self._log("submit_finding", "invalid_template")
+                    return _error(_TEMPLATE_HINT)
+                self._log("submit_finding", "db_error")
+                return _error("Nie udało się zapisać tezy. Sprawdź argumenty i spróbuj ponownie.")
             except DBAPIError:
                 s.rollback()
                 self._log("submit_finding", "db_error")
@@ -187,7 +209,7 @@ class AgentTools:
         self._log("submit_finding", "accepted")
         return _json({"status": "przyjęta", "start": match.start, "end": match.end})
 
-    async def request_action(self, typ: str, uzasadnienie: str) -> ToolResult:
+    def _request_action(self, typ: str, uzasadnienie: str) -> ToolResult:
         if not isinstance(typ, str) or not isinstance(uzasadnienie, str):
             self._log("request_action", "invalid_input")
             return _error("Argumenty typ i uzasadnienie muszą być tekstem.")
@@ -210,6 +232,39 @@ class AgentTools:
             s.commit()
         self._log("request_action", "ok", action_id=action_id)
         return _json({"status": "wniosek_utworzony", "id": action_id})
+
+    async def list_fragments(self) -> ToolResult:
+        return await asyncio.to_thread(self._list_fragments)
+
+    async def read_fragment(self, fragment_id: str) -> ToolResult:
+        return await asyncio.to_thread(self._read_fragment, fragment_id)
+
+    async def search_templates(self, kind: str, query: str) -> ToolResult:
+        return await asyncio.to_thread(self._search_templates, kind, query)
+
+    async def submit_finding(
+        self,
+        typ: str,
+        teza: str,
+        cytat: str,
+        fragment_id: str,
+        uzasadnienie: str,
+        poziom_ryzyka: str | None = None,
+        template_id: int | str | None = None,
+    ) -> ToolResult:
+        return await asyncio.to_thread(
+            self._submit_finding,
+            typ,
+            teza,
+            cytat,
+            fragment_id,
+            uzasadnienie,
+            poziom_ryzyka,
+            template_id,
+        )
+
+    async def request_action(self, typ: str, uzasadnienie: str) -> ToolResult:
+        return await asyncio.to_thread(self._request_action, typ, uzasadnienie)
 
 
 def _parse_template_id(value: object) -> int | None | bool:

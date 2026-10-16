@@ -11,6 +11,7 @@ import {
 import { DocumentView } from "../document/DocumentView";
 import { RiskReport, STATUS_LABELS, isReportHidden } from "../document/RiskReport";
 import { useAnalysis } from "../document/useAnalysis";
+import { useBusy } from "../useBusy";
 import { NewVersionForm } from "./NewVersionForm";
 
 type Props = { contractId: number; versionId?: number; analysisId?: number };
@@ -21,7 +22,7 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
   const [chosenAnalysis, setChosenAnalysis] = useState<number | null>(analysisId ?? null);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, guard] = useBusy();
   const [contractTick, setContractTick] = useState(0);
 
   useEffect(() => {
@@ -59,22 +60,21 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
     };
   }, [currentVersionId, analysisId, loadVersion]);
 
-  const { analysis, error: analysisError } = useAnalysis(chosenAnalysis);
+  const { analysis, error: analysisError, reload } = useAnalysis(chosenAnalysis);
 
-  async function startAnalysis() {
+  function startAnalysis() {
     if (!version) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const { analysis_id } = await postJson<AnalysisStarted>(`/api/versions/${version.id}/analyses`, {});
-      setChosenAnalysis(analysis_id);
-      setSelected(null);
-      await loadVersion(version.id);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
+    void guard(async () => {
+      setError(null);
+      try {
+        const { analysis_id } = await postJson<AnalysisStarted>(`/api/versions/${version.id}/analyses`, {});
+        setChosenAnalysis(analysis_id);
+        setSelected(null);
+        await loadVersion(version.id);
+      } catch (e) {
+        setError(errorMessage(e));
+      }
+    });
   }
 
   if (!contract) {
@@ -112,7 +112,7 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
       {version && (
         <>
           <div className="toolbar">
-            <span>Wersja {version.nr}</span>
+            <span data-testid="loaded-version">Wersja {version.nr}</span>
             <button type="button" onClick={startAnalysis} disabled={busy}>
               Uruchom analizę
             </button>
@@ -135,7 +135,11 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
               </label>
             )}
           </div>
-          {analysisError && <p className="error">{analysisError}</p>}
+          {analysisError && (
+            <p role="alert" className="error">
+              {analysisError}
+            </p>
+          )}
           <div className="workspace">
             <DocumentView
               text={version.text}
@@ -150,6 +154,7 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
                   fragments={version.fragments}
                   selectedId={selected}
                   onSelect={setSelected}
+                  onRefresh={reload}
                 />
                 {final && !hidden && <AnalysisActions analysisId={analysis.id} />}
               </div>
@@ -183,8 +188,8 @@ function AnalysisActions({ analysisId }: { analysisId: number }) {
 
   useEffect(() => {
     let active = true;
-    apiFetch<PendingAction[]>("/api/actions")
-      .then((all) => active && setActions(all.filter((a) => a.analysis_id === analysisId)))
+    apiFetch<PendingAction[]>(`/api/actions?analysis_id=${analysisId}`)
+      .then((list) => active && setActions(list))
       .catch((e) => active && setError(errorMessage(e)));
     return () => {
       active = false;

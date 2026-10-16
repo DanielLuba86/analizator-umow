@@ -5,7 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(extra="ignore")
+    # env_ignore_empty: `KLUCZ=` z .env.example oznacza „nie ustawiono”, nie pusty napis.
+    model_config = SettingsConfigDict(extra="ignore", env_ignore_empty=True)
 
     database_url: str
     anthropic_api_key: SecretStr | None = None
@@ -16,6 +17,8 @@ class Settings(BaseSettings):
     agent_max_findings: int = 60
     agent_timeout_s: int = 300
     max_contract_chars: int = 200_000
+    max_body_bytes: int = 1_048_576  # ciało żądania; nginx ma ten sam limit (client_max_body_size)
+    max_active_analyses: int = 5  # analizy queued/running naraz w całej aplikacji (koszt API)
     session_ttl_hours: int = 12
     cookie_secure: bool = True
     log_level: str = "INFO"

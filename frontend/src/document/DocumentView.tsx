@@ -22,7 +22,9 @@ export function DocumentView({ text, findings, selectedId = null, onSelect }: Pr
       {segments.map((s, i) => {
         if (s.findingIds.length === 0) return <span key={i}>{s.text}</span>;
         const selected = selectedId !== null && s.findingIds.includes(selectedId);
-        const select = () => onSelect?.(selected && selectedId !== null ? selectedId : s.findingIds[0]);
+        // Kolejne kliknięcie nakładających się podświetleń przechodzi do następnej tezy.
+        const next = selected && selectedId !== null ? (s.findingIds.indexOf(selectedId) + 1) % s.findingIds.length : 0;
+        const select = () => onSelect?.(s.findingIds[next]);
         return (
           <mark
             key={i}

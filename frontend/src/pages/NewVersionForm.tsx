@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 
 import { errorMessage, postJson } from "../api/client";
 import type { VersionCreated } from "../api/types";
+import { useBusy } from "../useBusy";
 import { readTextFile } from "./textFile";
 
 type Props = { contractId: number; onCreated: (versionId: number) => void };
@@ -9,7 +10,7 @@ type Props = { contractId: number; onCreated: (versionId: number) => void };
 export function NewVersionForm({ contractId, onCreated }: Props) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, guard] = useBusy();
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -23,19 +24,18 @@ export function NewVersionForm({ contractId, onCreated }: Props) {
     }
   }
 
-  async function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const { version_id } = await postJson<VersionCreated>(`/api/contracts/${contractId}/versions`, { text });
-      setText("");
-      onCreated(version_id);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
+    void guard(async () => {
+      setError(null);
+      try {
+        const { version_id } = await postJson<VersionCreated>(`/api/contracts/${contractId}/versions`, { text });
+        setText("");
+        onCreated(version_id);
+      } catch (err) {
+        setError(errorMessage(err));
+      }
+    });
   }
 
   return (

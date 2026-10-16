@@ -37,3 +37,12 @@ export const PRAWNIK = { id: 2, login: "prawnik", role: "prawnik" };
 export function problem(status: number, title: string, requestId: string) {
   return { type: "/problems/x", title, status, request_id: requestId };
 }
+
+/** Odpowiedź, którą test zwalnia ręcznie — żądanie „w locie” podczas kolejnych kliknięć. */
+export function deferred() {
+  let release: (r: Response) => void = () => {};
+  const promise = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}

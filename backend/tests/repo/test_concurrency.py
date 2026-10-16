@@ -4,6 +4,7 @@ Dane są zatwierdzane (inne połączenie musi je widzieć) i usuwane po teście.
 """
 
 # ruff: noqa: S106
+import asyncio
 import threading
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -11,13 +12,16 @@ from typing import Any
 
 import pytest
 from sqlalchemy import Engine, delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.agent.context import AnalysisContext
+from app.agent.tools import AgentTools
 from app.config import Settings
 from app.repo import actions, analyses, models
 from app.repo.actions import ActionAlreadyDecided
 from app.repo.analyses import AnalysisAlreadyActive
-from app.repo.contracts import add_contract, add_version
+from app.repo.contracts import add_contract, add_version, list_fragments
+from app.repo.templates import add_template_version
 from app.services import actions as actions_service
 
 SETTINGS = Settings(database_url="postgresql+psycopg://u:p@localhost/db")
@@ -44,6 +48,7 @@ def data(db_engine: Engine) -> Iterator[Data]:
         cid = add_contract(s, title="Wyścig", kind="najem", source="kontrahent", created_by=u.id)
         vid = add_version(s, cid, TEXT)
         aid = analyses.create_analysis(s, vid, u.id, "fake")
+        analyses.set_status(s, aid, "running")
         analyses.set_status(s, aid, "done")
         s.commit()
         d = Data(u.id, cid, vid, aid)
@@ -146,7 +151,7 @@ def test_concurrent_identical_requests_return_one_pending_action(
     def request(s: Session) -> int:
         analysis = analyses.get_analysis(s, data.analysis_id)
         assert analysis is not None
-        return actions_service.request_user_action(s, analysis, "eksport", data.user_id)
+        return actions_service.request_user_action(s, analysis, "eksport", data.user_id).id
 
     with Session(db_engine) as s1:
         first_id = request(s1)  # wiersz wstawiony, transakcja otwarta (unikat częściowy zajęty)
@@ -171,3 +176,55 @@ def test_concurrent_identical_requests_return_one_pending_action(
             .where(models.PendingAction.analysis_id == data.analysis_id)
         )
     assert n == 1
+
+
+def test_add_template_version_concurrent(db_engine: Engine) -> None:
+    name = "Wyścig wersji wzorca"
+    try:
+        result = race(
+            db_engine,
+            lambda s: add_template_version(s, "najem", name, "pierwsza"),
+            lambda s: add_template_version(s, "najem", name, "druga"),
+        )
+        assert "error" not in result, result.get("error")
+        assert result["value"] == 2
+        with Session(db_engine) as s:
+            versions = sorted(
+                s.scalars(
+                    select(models.Template.wersja).where(models.Template.nazwa_klauzuli == name)
+                )
+            )
+        assert versions == [1, 2]
+    finally:
+        with Session(db_engine) as s:
+            s.execute(delete(models.Template).where(models.Template.nazwa_klauzuli == name))
+            s.commit()
+
+
+def test_submit_finding_waits_for_analysis_row_lock(db_engine: Engine, data: Data) -> None:
+    """Liczenie tez i zapis są pod blokadą wiersza analizy (limit nie do obejścia wyścigiem)."""
+    with Session(db_engine) as s:
+        frag = list_fragments(s, data.version_id)[-1]  # § 1 z cytowanym zdaniem
+    ctx = AnalysisContext(data.analysis_id, data.version_id, "najem", max_findings=60)
+    tools = AgentTools(ctx, sessionmaker(db_engine))
+
+    def lock(s: Session) -> None:
+        s.execute(
+            select(models.Analysis.id)
+            .where(models.Analysis.id == data.analysis_id)
+            .with_for_update(key_share=True)  # FOR NO KEY UPDATE: nie koliduje z KEY SHARE z FK
+        ).one()
+
+    def submit(_: Session) -> Any:
+        return asyncio.run(
+            tools.submit_finding(
+                "termin",
+                "Czas nieoznaczony",
+                "lokal do używania na czas nieoznaczony",
+                frag.id,
+                "Uzasadnienie.",
+            )
+        )
+
+    result = race(db_engine, lock, submit)
+    assert result["value"]["is_error"] is False

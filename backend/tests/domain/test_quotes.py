@@ -52,8 +52,9 @@ def test_changed_word_rejected() -> None:
 
 def test_case_and_typography_must_match() -> None:
     for q in ["ZAPŁACI karę umowną", "zaplaci kare umowna w wysokosci"]:
-        with pytest.raises(QuoteNotFound):
+        with pytest.raises(QuoteNotFound) as e:
             verify_quote(TEXT, FRS, "f001", q)
+        assert e.value.reason == "brak_dosłownego_cytatu"
 
 
 def test_markdown_markers_must_match_and_hint_says_copy_verbatim() -> None:
@@ -170,15 +171,31 @@ def test_each_whitespace_char_equals_space(ws: str) -> None:
     assert m2.start == m.start
 
 
-def test_no_nfc_applied() -> None:
-    text = "§ 1. X\n\n1. Zażółć gęślą jaźń tutaj.\n"
-    decomposed = "Zażółć gęślą jaźń tutaj."
+def test_nfc_text_nfd_quote_not_matched() -> None:
     import unicodedata
 
-    nfd = unicodedata.normalize("NFD", decomposed)
-    assert nfd != decomposed
-    with pytest.raises(QuoteNotFound):
-        verify_quote(text, split_into_fragments(text), "f001", nfd)
+    composed = "Zażółć gęślą jaźń tutaj."
+    text = f"§ 1. X\n\n1. {composed}\n"
+    nfd_quote = unicodedata.normalize("NFD", composed)
+    assert nfd_quote != composed
+    with pytest.raises(QuoteNotFound) as e:
+        verify_quote(text, split_into_fragments(text), "f001", nfd_quote)
+    assert e.value.reason == "brak_dosłownego_cytatu"
+
+
+def test_nfd_text_nfc_quote_not_matched() -> None:
+    import unicodedata
+
+    composed = "Zażółć gęślą jaźń tutaj."
+    text = unicodedata.normalize("NFD", f"§ 1. X\n\n1. {composed}\n")
+    with pytest.raises(QuoteNotFound) as e:
+        verify_quote(text, split_into_fragments(text), "f001", composed)
+    assert e.value.reason == "brak_dosłownego_cytatu"
+
+
+def test_negative_min_len_rejected() -> None:
+    with pytest.raises(ValueError, match="min_len"):
+        verify_quote(TEXT, FRS, "f001", "zapłaci", min_len=-1)
 
 
 def test_exception_message_never_contains_quote_or_text() -> None:

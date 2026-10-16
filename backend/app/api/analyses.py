@@ -7,7 +7,7 @@ do odpowiedzi.
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,9 +15,9 @@ from app.agent.classifier import AnthropicClassifier, InjectionClassifier
 from app.agent.runner import AgentRunner
 from app.agent.sdk_runner import SdkAgentRunner
 from app.api.deps import DbDep, SettingsDep, UserDep, current_user, get_session_factory
-from app.api.errors import ApiError
+from app.api.errors import ApiError, request_id_of
 from app.repo import analyses, contracts
-from app.repo.analyses import AnalysisAlreadyActive, FindingRow
+from app.repo.analyses import AnalysisAlreadyActive, FindingRow, TooManyActiveAnalyses
 from app.repo.audit import audit
 from app.services.analysis import run_analysis
 from app.services.comparison import VersionsOfDifferentContracts, compare_versions
@@ -96,13 +96,18 @@ class ComparisonOut(BaseModel):
     finding_changes: dict[str, list[dict[str, str]]] | None
 
 
-VERSION_NOT_FOUND = ApiError(404, "nie_znaleziono_wersji", "Nie znaleziono wersji umowy.")
-ANALYSIS_NOT_FOUND = ApiError(404, "nie_znaleziono_analizy", "Nie znaleziono analizy.")
+def version_not_found() -> ApiError:
+    return ApiError(404, "nie_znaleziono_wersji", "Nie znaleziono wersji umowy.")
+
+
+def analysis_not_found() -> ApiError:
+    return ApiError(404, "nie_znaleziono_analizy", "Nie znaleziono analizy.")
 
 
 @router.post("/versions/{version_id}/analyses", status_code=202)
 def start_analysis(
     version_id: int,
+    request: Request,
     background: BackgroundTasks,
     db: DbDep,
     user: UserDep,
@@ -112,12 +117,19 @@ def start_analysis(
     classifier: Annotated[InjectionClassifier, Depends(get_classifier)],
 ) -> AnalysisStarted:
     if contracts.find_version(db, version_id) is None:
-        raise VERSION_NOT_FOUND
+        raise version_not_found()
     try:
-        aid = analyses.create_analysis(db, version_id, user.id, settings.agent_model)
+        aid = analyses.create_analysis(
+            db, version_id, user.id, settings.agent_model, max_active=settings.max_active_analyses
+        )
     except AnalysisAlreadyActive:
         db.rollback()
         raise ApiError(409, "analiza_w_toku", "Dla tej wersji trwa już analiza.") from None
+    except TooManyActiveAnalyses:
+        db.rollback()
+        raise ApiError(
+            429, "za_duzo_analiz", "Trwa zbyt wiele analiz. Spróbuj ponownie za kilka minut."
+        ) from None
     audit(db, user.id, "analysis_start", f"analysis:{aid}")
     db.commit()
     background.add_task(
@@ -127,6 +139,7 @@ def start_analysis(
         runner=runner,
         classifier=classifier,
         settings=settings,
+        request_id=request_id_of(request),
     )
     return AnalysisStarted(analysis_id=aid)
 
@@ -135,7 +148,7 @@ def start_analysis(
 def get_report(analysis_id: int, db: DbDep) -> AnalysisReport:
     a = analyses.get_analysis(db, analysis_id)
     if a is None:
-        raise ANALYSIS_NOT_FOUND
+        raise analysis_not_found()
     q = quarantine_state(db, analysis_id)
     quarantine = None if q is None else QuarantineOut(action_id=q.action_id, status=q.status)
     findings = [finding_out(f) for f in visible_findings(db, a)]
@@ -157,7 +170,7 @@ def get_report(analysis_id: int, db: DbDep) -> AnalysisReport:
 def create_comparison(body: ComparisonIn, db: DbDep, user: UserDep) -> ComparisonOut:
     for vid in (body.version_a, body.version_b):
         if contracts.find_version(db, vid) is None:
-            raise VERSION_NOT_FOUND
+            raise version_not_found()
     try:
         result = compare_versions(db, body.version_a, body.version_b)
     except VersionsOfDifferentContracts:

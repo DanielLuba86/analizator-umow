@@ -78,7 +78,7 @@ def analysis(client: TestClient, text: str = TEXT) -> int:
 
 def request(client: TestClient, aid: int, typ: str) -> int:
     r = client.post(f"/api/analyses/{aid}/actions", json={"typ": typ})
-    assert r.status_code == 201, r.text
+    assert r.status_code in (200, 201), r.text
     action_id: int = r.json()["action_id"]
     return action_id
 
@@ -306,3 +306,49 @@ def test_agent_justification_hidden_while_report_hidden(
     assert decide(lawyer, q_id, True).status_code == 200
     (item,) = [a for a in lawyer.get("/api/actions").json() if a["id"] == action_id]
     assert item["payload"]["uzasadnienie"] == AGENT_TEXT
+
+
+def test_new_action_returns_201_existing_pending_returns_200(assistant: TestClient) -> None:
+    aid = analysis(assistant)
+    first = assistant.post(f"/api/analyses/{aid}/actions", json={"typ": "eksport"})
+    second = assistant.post(f"/api/analyses/{aid}/actions", json={"typ": "eksport"})
+    assert (first.status_code, second.status_code) == (201, 200)
+    assert first.json() == second.json()
+
+
+def test_template_with_rejection_422(
+    assistant: TestClient, lawyer: TestClient, sf: sessionmaker[Session]
+) -> None:
+    aid = analysis(assistant)
+    action_id = _agent_template_request(sf, aid)
+    template = {"nazwa_klauzuli": "Kara", "tresc": "Kara 100 zł."}
+    r = decide(lawyer, action_id, False, template=template)
+    assert r.status_code == 422
+    assert r.json()["type"] == "/problems/wzorzec_niedozwolony"
+
+
+def test_template_for_non_wzorzec_422(assistant: TestClient, lawyer: TestClient) -> None:
+    aid = analysis(assistant)
+    action_id = request(assistant, aid, "eksport")
+    template = {"nazwa_klauzuli": "Kara", "tresc": "Kara 100 zł."}
+    r = decide(lawyer, action_id, True, template=template)
+    assert r.status_code == 422
+    assert r.json()["type"] == "/problems/wzorzec_niedozwolony"
+
+
+def test_export_headers(assistant: TestClient, lawyer: TestClient) -> None:
+    aid = analysis(assistant)
+    export_id = decide(lawyer, request(assistant, aid, "eksport"), True).json()["export_id"]
+    e = assistant.get(f"/api/exports/{export_id}")
+    assert e.headers["x-content-type-options"] == "nosniff"
+    assert e.headers["cache-control"] == "no-store"
+
+
+def test_list_actions_filter_by_analysis(assistant: TestClient) -> None:
+    a1, a2 = analysis(assistant), analysis(assistant)
+    id1, id2 = request(assistant, a1, "eksport"), request(assistant, a2, "eksport")
+    listed = assistant.get(f"/api/actions?analysis_id={a1}").json()
+    assert [a["id"] for a in listed] == [id1]
+    both = assistant.get("/api/actions").json()
+    assert {id1, id2} <= {a["id"] for a in both}
+    assert assistant.get("/api/actions?analysis_id=abc").status_code == 422

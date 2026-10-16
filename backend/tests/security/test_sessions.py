@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.repo.models import Session as SessionRow
 from app.repo.models import User
-from app.security.sessions import create_session, delete_session, resolve_session
+from app.security.sessions import (
+    create_session,
+    delete_expired_sessions,
+    delete_session,
+    resolve_session,
+)
 
 
 def _user(s: Session) -> int:
@@ -47,3 +52,14 @@ def test_delete_session(db_session: Session) -> None:
     delete_session(db_session, token)
     assert resolve_session(db_session, token) is None
     delete_session(db_session, token)  # brak błędu przy ponownym usunięciu
+
+
+def test_delete_expired_sessions_keeps_live(db_session: Session) -> None:
+    uid = _user(db_session)
+    live = create_session(db_session, uid, 8)
+    now = datetime.now(UTC)
+    db_session.add(SessionRow(token_hash="e" * 64, user_id=uid, expires_at=now - timedelta(1)))
+    db_session.flush()
+    assert delete_expired_sessions(db_session, now) == 1
+    hashes = list(db_session.scalars(select(SessionRow.token_hash)))
+    assert hashes == [hashlib.sha256(live.encode()).hexdigest()]

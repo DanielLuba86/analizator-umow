@@ -48,3 +48,24 @@ test("413 shows the server message", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Dodaj wersję" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Tekst umowy przekracza dopuszczalną długość.");
 });
+
+
+test("rejects file larger than limit before reading", async () => {
+  mockFetch([]);
+  render(<NewVersionForm contractId={3} onCreated={vi.fn()} />);
+  const file = new File(["x"], "duza.md", { type: "text/markdown" });
+  Object.defineProperty(file, "size", { value: 800_001 });
+  const text = vi.spyOn(file, "text");
+  await userEvent.upload(screen.getByLabelText("Plik (.md, .txt)"), file);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Plik jest za duży");
+  expect(text).not.toHaveBeenCalled();
+});
+
+test("rejects text longer than 200000 chars", async () => {
+  mockFetch([]);
+  render(<NewVersionForm contractId={3} onCreated={vi.fn()} />);
+  const file = new File(["a".repeat(200_001)], "dluga.md", { type: "text/markdown" });
+  await userEvent.upload(screen.getByLabelText("Plik (.md, .txt)"), file);
+  expect(await screen.findByRole("alert")).toHaveTextContent("200 000 znaków");
+  expect(screen.getByLabelText("Tekst nowej wersji")).toHaveValue("");
+});

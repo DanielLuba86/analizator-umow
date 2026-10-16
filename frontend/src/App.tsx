@@ -5,6 +5,7 @@ import { ComparePage } from "./pages/ComparePage";
 import { ContractPage } from "./pages/ContractPage";
 import { ContractsPage } from "./pages/ContractsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { matchRoute, navigate, useRoute } from "./router";
 
 function Page({ path, isLawyer }: { path: string; isLawyer: boolean }) {
@@ -19,7 +20,9 @@ function Page({ path, isLawyer }: { path: string; isLawyer: boolean }) {
   if (path === "/approvals") {
     return isLawyer ? <ApprovalsPage /> : <p role="alert">Kolejka wniosków jest dostępna tylko dla prawnika.</p>;
   }
-  return <ContractsPage />;
+  // "/login" zostaje w adresie po wylogowaniu i ponownym zalogowaniu.
+  if (["/", "/contracts", "/login"].includes(path)) return <ContractsPage />;
+  return <NotFoundPage />;
 }
 
 function Shell() {

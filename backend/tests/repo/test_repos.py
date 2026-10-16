@@ -14,11 +14,14 @@ from app.repo import models
 from app.repo.actions import ActionAlreadyDecided, decide_action, list_pending, request_action
 from app.repo.analyses import (
     AnalysisAlreadyActive,
+    InvalidTransition,
     active_analysis,
     add_finding,
     add_rejected,
+    claim_analysis,
     count_findings,
     create_analysis,
+    fail_interrupted,
     list_findings,
     set_status,
 )
@@ -219,3 +222,44 @@ def test_seed_custom_templates_path(db_session: Session, tmp_path: Path) -> None
     p.write_text('[{"kind": "najem", "nazwa_klauzuli": "X", "tresc": "Y"}]', encoding="utf-8")
     seed(db_session, _settings(), templates_path=p)
     assert db_session.scalar(select(func.count()).select_from(models.Template)) == 1
+
+
+def test_claim_analysis_only_from_queued(db_session: Session) -> None:
+    uid, vid = _version(db_session)
+    aid = create_analysis(db_session, vid, uid, "m")
+    assert claim_analysis(db_session, aid) is True
+    assert claim_analysis(db_session, aid) is False
+    row = db_session.get(models.Analysis, aid)
+    assert row is not None and row.status == "running"
+
+
+def test_set_status_rejects_done_to_running(db_session: Session) -> None:
+    uid, vid = _version(db_session)
+    aid = create_analysis(db_session, vid, uid, "m")
+    set_status(db_session, aid, "running")
+    set_status(db_session, aid, "done")
+    with pytest.raises(InvalidTransition):
+        set_status(db_session, aid, "running")
+
+
+def test_set_status_rejects_queued_to_done(db_session: Session) -> None:
+    uid, vid = _version(db_session)
+    aid = create_analysis(db_session, vid, uid, "m")
+    with pytest.raises(InvalidTransition):
+        set_status(db_session, aid, "done")
+
+
+def test_recovery_and_quarantine_decisions_still_allowed(db_session: Session) -> None:
+    uid, vid = _version(db_session)
+    queued = create_analysis(db_session, vid, uid, "m")
+    set_status(db_session, queued, "failed", reason="przerwana")  # błąd przed startem agenta
+    running = create_analysis(db_session, vid, uid, "m")
+    set_status(db_session, running, "running")
+    assert fail_interrupted(db_session, "restart") == [running]
+    quarantined = create_analysis(db_session, vid, uid, "m")
+    set_status(db_session, quarantined, "running")
+    set_status(db_session, quarantined, "quarantined", reason="wstrzyknięcie")
+    set_status(db_session, quarantined, "done")  # zatwierdzenie kwarantanny
+    budget = create_analysis(db_session, vid, uid, "m")
+    set_status(db_session, budget, "running")
+    set_status(db_session, budget, "budget_exceeded")

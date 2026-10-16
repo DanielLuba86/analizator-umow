@@ -77,6 +77,9 @@ def check_links() -> list[str]:
     return errors
 
 
+MERMAID_TIMEOUT_S = 120
+
+
 def check_mermaid() -> list[str]:
     errors = []
     blocks = [
@@ -91,7 +94,13 @@ def check_mermaid() -> list[str]:
             cmd = ["npx", "-y", MERMAID_CLI, "-q", "-i", str(src), "-o", str(Path(tmp) / "out.svg")]
             if PUPPETEER_CONFIG.exists():
                 cmd += ["-p", str(PUPPETEER_CONFIG)]
-            run = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
+            try:
+                run = subprocess.run(  # noqa: S603
+                    cmd, capture_output=True, text=True, check=False, timeout=MERMAID_TIMEOUT_S
+                )
+            except subprocess.TimeoutExpired:
+                errors.append(f"{path.relative_to(ROOT)}: diagram {i}: timeout mermaid-cli")
+                continue
             if run.returncode != 0:
                 detail = (run.stderr or run.stdout).strip().splitlines()
                 errors.append(

@@ -1,11 +1,16 @@
 # ruff: noqa: S106
 import json
+import threading
 from typing import Any
 
+import psycopg
+import pytest
 from db_env import QUOTE, TEXT, Env
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
-from app.agent.tools import AgentTools
+from app.agent import tools as tools_module
+from app.agent.tools import TOOL_NAMES, AgentTools
 from app.repo import models
 from app.repo.templates import add_template_version
 
@@ -81,7 +86,7 @@ async def test_read_fragment_unknown_id_is_error(env: Env) -> None:
     tools = env.tools()
     r = await tools.read_fragment("f999")
     assert r["is_error"] is True
-    assert "f999" not in _text(r) or "list_fragments" in _text(r)
+    assert "list_fragments" in _text(r)
 
 
 async def test_read_fragment_of_other_version_is_not_reachable(env: Env) -> None:
@@ -296,3 +301,68 @@ async def test_methods_do_not_accept_analysis_or_version_ids() -> None:
     ):
         params = inspect.signature(getattr(AgentTools, name)).parameters
         assert "analysis_id" not in params and "version_id" not in params
+
+
+async def test_list_fragments_ignores_other_versions(env: Env) -> None:
+    other = TEXT + "\n§ 3. Tylko w innej wersji\nTajne postanowienie innej wersji.\n"
+    env.version(other)
+    tools = env.tools()
+    data = json.loads(_text(await tools.list_fragments()))
+    assert [d["id"] for d in data] == ["f001", "f002", "f003"]
+
+
+async def test_submit_finding_too_short_quote(env: Env) -> None:
+    tools = env.tools()
+    r = await tools.submit_finding("kara", "Teza", "karę", "f003", "Uzasadnienie.", "wysokie")
+    assert r["is_error"] is True and _text(r).startswith("za_krótki_cytat")
+    assert env.rejected_reasons(tools.ctx.analysis_id) == ["za_krótki_cytat"]
+
+
+async def test_over_limit_invalid_claim_returns_limit_without_record(env: Env) -> None:
+    """Nieprawidłowej tezy nie zapisujemy nigdy (łamałaby ograniczenia CHECK); po limicie
+    agent dostaje komunikat o limicie, żeby przestał zgłaszać."""
+    tools = env.tools(max_findings=1)
+    ok = await tools.submit_finding("kara", "Teza", QUOTE, "f003", "Uzasadnienie.", "wysokie")
+    assert ok["is_error"] is False
+    r = await tools.submit_finding("plotka", "Teza", QUOTE, "f003", "Uzasadnienie.")
+    assert r["is_error"] is True and _text(r).startswith("limit_tez")
+    assert env.count_rejected(tools.ctx.analysis_id) == 0
+
+
+async def test_integrity_error_other_than_fk_is_not_template_hint(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unique_violation(*args: Any, **kwargs: Any) -> int:
+        raise IntegrityError("INSERT", {}, psycopg.errors.UniqueViolation())
+
+    monkeypatch.setattr(tools_module.analyses, "add_finding", unique_violation)
+    tools = env.tools()
+    r = await tools.submit_finding("kara", "Teza", QUOTE, "f003", "Uzasadnienie.", "wysokie")
+    assert r["is_error"] is True
+    assert "template_id" not in _text(r)
+
+
+async def test_tools_do_db_work_off_the_event_loop_thread(env: Env) -> None:
+    loop_thread = threading.get_ident()
+    seen: list[int] = []
+    real_sf = env.sf
+
+    def recording_sf() -> Any:
+        seen.append(threading.get_ident())
+        return real_sf()
+
+    tools = env.tools()
+    tools._sf = recording_sf  # type: ignore[assignment]
+    await tools.list_fragments()
+    await tools.read_fragment("f003")
+    await tools.search_templates("najem", "kara")
+    await tools.submit_finding("kara", "Teza", QUOTE, "f003", "Uzasadnienie.", "wysokie")
+    await tools.request_action("opinia", "Powód.")
+    assert seen and loop_thread not in seen
+
+
+def test_tool_names_single_source() -> None:
+    from app.agent import fake_runner, sdk_runner
+
+    assert fake_runner.TOOL_NAMES is TOOL_NAMES
+    assert sdk_runner.ALLOWED_TOOLS == [f"mcp__umowy__{n}" for n in TOOL_NAMES]

@@ -26,9 +26,11 @@ type Props = {
   fragments: FragmentDto[];
   selectedId?: number | null;
   onSelect?: (findingId: number) => void;
+  /** Ponowne pobranie raportu, np. gdy prawnik zatwierdzi wniosek o zwolnienie z kwarantanny. */
+  onRefresh?: () => void;
 };
 
-export function RiskReport({ analysis, fragments, selectedId = null, onSelect }: Props) {
+export function RiskReport({ analysis, fragments, selectedId = null, onSelect, onRefresh }: Props) {
   const labels = new Map(fragments.map((f) => [f.id, f.label]));
   const hidden = isReportHidden(analysis);
   const findings = [...analysis.findings].sort((a, b) => riskRank(a) - riskRank(b) || a.id - b.id);
@@ -44,6 +46,14 @@ export function RiskReport({ analysis, fragments, selectedId = null, onSelect }:
           Analiza jest w kwarantannie: {quarantineReason(analysis.reason)}. Wyniki pozostaną ukryte,
           dopóki prawnik nie zatwierdzi wniosku o ich udostępnienie.
           {analysis.quarantine?.status === "odrzucona" && " Wniosek został odrzucony."}
+          {onRefresh && (
+            <>
+              {" "}
+              <button type="button" onClick={onRefresh}>
+                Odśwież
+              </button>
+            </>
+          )}
         </p>
       )}
       {!hidden && analysis.incomplete && (
