@@ -36,7 +36,7 @@
 
 ---
 
-### Zadanie 1: Infrastruktura i CI
+### Task 1: Infrastruktura i CI
 
 Pozycje: B1, B2, B3, B5, B6, B7, B11 (część nginx), B20, C11.
 
@@ -52,7 +52,7 @@ Pozycje: B1, B2, B3, B5, B6, B7, B11 (część nginx), B20, C11.
 - [ ] **Krok 8 (weryfikacja):** `docker compose up --build -d`; `curl -s localhost:8080/api/health` → `{"status":"ok"}`; `curl -s localhost:8000` → connection refused; `docker compose exec frontend id -u` ≠ 0.
 - [ ] **Krok 9:** commit „Przypnij obrazy, uruchom nginx bez roota i uszczelnij CI”.
 
-### Zadanie 2: Schemat i repozytoria
+### Task 2: Schemat i repozytoria
 
 Pozycje: B8, B9, B10 (bez c), A10 (repo), A11 (kolumna), B17 (repo).
 
@@ -70,7 +70,7 @@ Pozycje: B8, B9, B10 (bez c), A10 (repo), A11 (kolumna), B17 (repo).
 - [ ] **Krok 4 (GREEN):** pełny `pytest`, `alembic upgrade head && alembic downgrade base && alembic upgrade head` na czystej bazie testowej.
 - [ ] **Krok 5:** commit „Dodaj indeksy kluczy obcych, walidację przejść statusu i blokadę wersji wzorca”.
 
-### Zadanie 3: Agent i serwis analizy
+### Task 3: Agent i serwis analizy
 
 Pozycje: A5–A16 (bez A15b), A10/A11 (serwis).
 
@@ -100,7 +100,7 @@ Pozycje: A5–A16 (bez A15b), A10/A11 (serwis).
 - [ ] **Krok 4 (weryfikacja, bez kosztów):** powtórzyć próbę inicjalizacji z fałszywym kluczem (procedura Task 4.3 z `progress.md`). Komunikat `init` musi zawierać dokładnie 5 narzędzi `mcp__umowy__*`, a wynik to `failed/api_error`.
 - [ ] **Krok 5:** commit „Uszczelnij agenta: lista dozwolonych zmiennych, jednokrotny start analizy, dokładniejsze powody błędów”.
 
-### Zadanie 4: Domena
+### Task 4: Domena
 
 Pozycje: A1, A2, A3, A4 (a, b, d).
 
@@ -110,7 +110,7 @@ Pozycje: A1, A2, A3, A4 (a, b, d).
 - [ ] **Krok 2:** `_HINTS: Mapping[RejectReason, str]`; walidacja `min_len >= 0`. W `injection.py` usunąć lookbehind i odrzucać trafienie, gdy `re.search(r"\bif[\s,]*$", text[max(0, start - 20):start], re.IGNORECASE)`. A3: `bisect_right` po posortowanych `start` fragmentów. A4: rozpakowanie krotki z `normalize_whitespace` zamiast indeksu `[0]`.
 - [ ] **Krok 3 (GREEN)** i commit „Popraw heurystykę wstrzyknięć i walidację cytatów”.
 
-### Zadanie 5: API
+### Task 5: API
 
 Pozycje: B4, B11 (aplikacja), B13, B14, B15, B16, B17 (wywołanie), B18, B19 (wywołanie), B21, B22, B23 (backend).
 
@@ -134,7 +134,7 @@ Pozycje: B4, B11 (aplikacja), B13, B14, B15, B16, B17 (wywołanie), B18, B19 (wy
 - [ ] **Krok 3 (GREEN):** pełny `pytest`. Uruchomić `npx vitest run`, bo frontend może zakładać 201.
 - [ ] **Krok 4:** commit „Dodaj limit rozmiaru żądania, kontrolę Origin i globalny limit analiz w API”.
 
-### Zadanie 6: Frontend
+### Task 6: Frontend
 
 Pozycje: C1–C9, C4 (przełączenie na filtr z zadania 5).
 
@@ -156,7 +156,7 @@ Pozycje: C1–C9, C4 (przełączenie na filtr z zadania 5).
 - [ ] **Krok 3 (GREEN):** `npm run lint && npx tsc --noEmit && npx vitest run`.
 - [ ] **Krok 4:** commit „Dodaj odświeżanie kwarantanny, stronę 404 i limit rozmiaru pliku we frontendzie”.
 
-### Zadanie 7: Dokumentacja
+### Task 7: Dokumentacja
 
 Pozycje: C10 oraz dokumentacja nowych zabezpieczeń.
 
@@ -166,7 +166,7 @@ Pozycje: C10 oraz dokumentacja nowych zabezpieczeń.
 - [ ] **Krok 2 (weryfikacja):** `python3 scripts/check_docs.py` → 0 błędów; `cd backend && uv run python ../scripts/check_threat_model.py` → 0 błędów.
 - [ ] **Krok 3:** commit „Zaktualizuj model zagrożeń i arc42 po poprawkach”.
 
-### Zadanie 8: Weryfikacja końcowa i PR
+### Task 8: Weryfikacja końcowa i PR
 
 - [ ] **Krok 1:** świeży klon, README krok po kroku z nowym `COMPOSE_PROJECT_NAME` (nowy wolumen). Playwright: asystent wgrywa `jawne_polecenie.md` → kwarantanna → prawnik zatwierdza → asystent klika „Odśwież” → 2 podświetlenia. Logowanie przez UI działa (Origin za nginx). 20 szybkich `POST /api/auth/login` → co najmniej jedno 429.
 - [ ] **Krok 2:** przegląd całej gałęzi, poprawki, wpis w `progress.md`.

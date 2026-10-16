@@ -23,15 +23,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    # bez ports: backend jest dostępny tylko przez nginx (CSP, limit logowania, limit rozmiaru)
 
   frontend:
     build: frontend
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - "8080:8080"
 
 volumes:
   pgdata:

@@ -60,3 +60,21 @@ def test_mermaid_fence_with_trailing_space_or_indent_is_found() -> None:
     blocks = docs.mermaid_blocks(text)
     assert len(blocks) == 2
     assert blocks[1].strip() == "sequenceDiagram"
+
+
+def test_mermaid_timeout_reported_as_error(monkeypatch, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import subprocess
+
+    doc = tmp_path / "a.md"
+    doc.write_text("```mermaid\ngraph TD; A-->B\n```\n", encoding="utf-8")
+    monkeypatch.setattr(docs, "ROOT", tmp_path)
+    monkeypatch.setattr(docs, "documents", lambda: [doc])
+
+    def hang(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        assert kwargs.get("timeout"), "wywołanie mermaid-cli musi mieć timeout"
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(docs.subprocess, "run", hang)
+    errors = docs.check_mermaid()
+    assert len(errors) == 1
+    assert "a.md" in errors[0] and "timeout" in errors[0]

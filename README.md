@@ -49,8 +49,13 @@ docker compose exec backend python -m app.repo.seed   # wzorce klauzul i konta d
 
 Seed można uruchamiać wielokrotnie: istniejących wzorców i kont nie duplikuje.
 
-Aplikacja działa pod adresem **http://localhost:8080**. API jest też bezpośrednio pod
-http://localhost:8000; `curl localhost:8080/api/health` zwraca `{"status":"ok"}`.
+Aplikacja działa pod adresem **http://localhost:8080**; `curl localhost:8080/api/health` zwraca
+`{"status":"ok"}`. Backend nie jest wystawiony na hosta: cały ruch idzie przez nginx, który dodaje
+CSP, ogranicza rozmiar żądania i liczbę prób logowania (10 na minutę z jednego adresu IP).
+
+Za TLS (HTTPS) ustaw w `.env` `COOKIE_SECURE=true`, żeby przeglądarka wysyłała cookie sesji
+tylko szyfrowanym połączeniem. Lokalnie, przez zwykłe HTTP, zostaw `false` — inaczej logowanie
+nie zadziała.
 
 ### Konta demo
 
