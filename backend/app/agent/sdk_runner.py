@@ -33,6 +33,7 @@ from claude_agent_sdk import (
 
 from app.agent.context import AnalysisContext
 from app.agent.prompt import SYSTEM_PROMPT
+from app.agent.provider import agent_credentials_env, has_credentials
 from app.agent.runner import RunOutcome
 from app.agent.tools import TOOL_NAMES, AgentTools, ToolResult
 from app.config import Settings
@@ -211,15 +212,16 @@ def build_mcp_server(tools: AgentTools, gate: Gate | None = None) -> McpSdkServe
     return create_sdk_mcp_server(name=SERVER_NAME, tools=build_sdk_tools(tools, gate))
 
 
-def agent_env(api_key: str) -> dict[str, str]:
+def agent_env(settings: Settings) -> dict[str, str]:
+    """Wyczyszczone dziedziczone zmienne plus dane logowania wybranego dostawcy (ADR 0009)."""
     blanked = {k: "" for k in os.environ if k not in ENV_ALLOWLIST}
-    return {**blanked, "ANTHROPIC_API_KEY": api_key}
+    return {**blanked, **agent_credentials_env(settings)}
 
 
 def build_options(settings: Settings, server: McpSdkServerConfig) -> ClaudeAgentOptions:
     """Opcje przebiegu. Tworzy katalog roboczy (cwd); usuwa go `SdkAgentRunner.run`."""
-    if settings.anthropic_api_key is None:
-        raise ValueError("Brak ANTHROPIC_API_KEY")
+    if not has_credentials(settings):
+        raise ValueError("brak danych logowania dostawcy")
     return ClaudeAgentOptions(
         model=settings.agent_model,
         system_prompt=SYSTEM_PROMPT,
@@ -230,7 +232,7 @@ def build_options(settings: Settings, server: McpSdkServerConfig) -> ClaudeAgent
         setting_sources=[],
         max_turns=settings.agent_max_turns,
         max_budget_usd=settings.agent_max_budget_usd,
-        env=agent_env(settings.anthropic_api_key.get_secret_value()),
+        env=agent_env(settings),
         cwd=tempfile.mkdtemp(prefix="agent-"),
     )
 
@@ -292,7 +294,7 @@ class SdkAgentRunner:
         return RunOutcome("failed", self._turns, 0.0, "brak_wyniku")
 
     async def run(self, ctx: AnalysisContext, tools: AgentTools) -> RunOutcome:
-        if self._settings.anthropic_api_key is None:
+        if not has_credentials(self._settings):
             out = RunOutcome("failed", 0, 0.0, NO_API_KEY)
             log.error(
                 "agent_run", analysis_id=ctx.analysis_id, status=out.status, reason=out.reason

@@ -120,3 +120,24 @@ async def test_fake_classifier_returns_hits_or_raises() -> None:
     assert await FakeClassifier([hit]).classify(FRAGS) == [hit]
     with pytest.raises(ClassifierUnavailable):
         await FakeClassifier(ClassifierUnavailable()).classify(FRAGS)
+
+
+def _foundry(key: str | None) -> Settings:
+    return Settings(
+        database_url="postgresql+psycopg://u:p@localhost/db",
+        llm_provider="foundry",
+        anthropic_api_key=SecretStr("sk-claude-api"),
+        anthropic_foundry_api_key=SecretStr(key) if key else None,
+        anthropic_foundry_resource="moj-zasob",
+    )
+
+
+def test_foundry_without_foundry_key_is_unavailable() -> None:
+    """Klucz Claude API nie jest cichym zastępstwem dla brakującego klucza Foundry."""
+    with pytest.raises(ClassifierUnavailable):
+        AnthropicClassifier(_foundry(None))._get_client()  # przed jakimkolwiek żądaniem
+
+
+def test_foundry_classifier_uses_foundry_client() -> None:
+    client = AnthropicClassifier(_foundry("k-f"))._get_client()
+    assert isinstance(client, anthropic.AsyncAnthropicFoundry)
