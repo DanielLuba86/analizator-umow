@@ -345,3 +345,21 @@ async def test_run_analysis_binds_request_id(env: Env) -> None:
     )
     assert seen.get("request_id") == "req-123"
     assert "request_id" not in structlog.contextvars.get_contextvars()
+
+
+async def test_claim_failure_is_logged_not_raised(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import analysis as service
+
+    def broken(*args: Any, **kwargs: Any) -> bool:
+        raise RuntimeError("baza niedostępna")
+
+    monkeypatch.setattr(service.analyses, "claim_analysis", broken)
+    aid = new_analysis(env, CLEAN)
+    with structlog.testing.capture_logs() as logs:
+        await go(env, aid)  # nie rzuca — wyjątek w zadaniu w tle to tylko traceback uvicorna
+    assert [(e["event"], e.get("error")) for e in logs] == [
+        ("analysis_claim_failed", "RuntimeError")
+    ]
+    assert analysis_row(env, aid).status == "queued"  # sprząta fail_interrupted przy restarcie

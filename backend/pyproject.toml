@@ -35,4 +35,6 @@ select = ["E", "F", "I", "B", "UP", "S"]
 [tool.mypy]
 strict = true
 packages = ["app"]
+# `mypy .` sprawdza to samo co `mypy`: testy nie są pakietem (kilka conftest.py bez __init__.py).
+exclude = ["^tests/"]
 

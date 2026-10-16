@@ -12,6 +12,12 @@ REPORT_VISIBLE_STATUSES = ("done", "budget_exceeded", "failed")
 INCOMPLETE_STATUSES = ("budget_exceeded", "failed")
 
 
+def is_incomplete(analysis: Analysis) -> bool:
+    """Niepełny: przebieg przerwany albo agent nie skończył (np. limit tur), także gdy
+    kwarantanna przykryła jego wynik, a prawnik ją potem zatwierdził (status `done`)."""
+    return analysis.status in INCOMPLETE_STATUSES or analysis.agent_reason is not None
+
+
 @dataclass(frozen=True)
 class QuarantineState:
     action_id: int

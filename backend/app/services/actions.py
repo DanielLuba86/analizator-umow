@@ -17,7 +17,7 @@ from app.repo.actions import ActionRow
 from app.repo.audit import audit
 from app.repo.models import Analysis
 from app.repo.templates import add_template_version
-from app.services.reports import INCOMPLETE_STATUSES, is_report_visible
+from app.services.reports import is_incomplete, is_report_visible
 
 UserActionType = Literal["eksport", "opinia"]
 
@@ -78,7 +78,7 @@ def export_content(s: Session, analysis: Analysis, approved_by: int) -> dict[str
         "contract": {"id": contract.id, "title": contract.title, "kind": contract.kind},
         "status": analysis.status,
         "official": analysis.official,
-        "incomplete": analysis.status in INCOMPLETE_STATUSES,
+        "incomplete": is_incomplete(analysis),
         "approved_by": approved_by,
         "generated_at": datetime.now(UTC).isoformat(),
         "findings": [

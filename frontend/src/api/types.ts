@@ -67,6 +67,8 @@ export type Analysis = {
   version_id: number;
   status: AnalysisStatus;
   reason: string | null;
+  /** Wynik agenta, gdy nie zakończył normalnie (np. limit tur); wtedy raport jest niepełny. */
+  agent_reason: string | null;
   turns: number | null;
   cost_usd: number | null;
   incomplete: boolean;
