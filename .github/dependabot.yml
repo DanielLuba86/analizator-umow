@@ -12,9 +12,19 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    # Paczki, które muszą zmieniać wersję razem — osobne PR-y nie przechodzą `npm ci`.
+    groups:
+      eslint:
+        patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "typescript-eslint", "typescript"]
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
   - package-ecosystem: docker
     directories:
       - /backend
       - /frontend
     schedule:
       interval: weekly
+    ignore:
+      # Nieparzyste wersje Node nie dostają LTS; zostajemy na parzystych (LTS).
+      - dependency-name: node
+        versions: ["23.x", "25.x", "27.x", "29.x"]
