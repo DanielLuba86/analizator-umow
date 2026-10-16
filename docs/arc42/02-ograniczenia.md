@@ -4,7 +4,7 @@
 
 | Ograniczenie | Uzasadnienie |
 |---|---|
-| Backend Python 3.12, FastAPI, SQLAlchemy 2, Alembic | wymaganie projektu; Claude Agent SDK ma pierwszorzędne wsparcie dla Pythona ([ADR 0001](../adr/0001-python-fastapi-i-react.md)) |
+| Backend Python 3.14 (minimum 3.12), FastAPI, SQLAlchemy 2, Alembic | wymaganie projektu; Claude Agent SDK ma pierwszorzędne wsparcie dla Pythona ([ADR 0001](../adr/0001-python-fastapi-i-react.md)) |
 | Agent na Claude Agent SDK wyłącznie z własnymi narzędziami MCP in-process | wymaganie projektu i zasada najmniejszych uprawnień ([ADR 0002](../adr/0002-claude-agent-sdk-z-wlasnymi-narzedziami.md)) |
 | Frontend React 18 + Vite + TypeScript (`strict`) | wymaganie projektu |
 | PostgreSQL 16 w docker-compose | trwałe dane, transakcje i blokady wierszy ([ADR 0006](../adr/0006-postgresql-w-docker-compose.md)) |

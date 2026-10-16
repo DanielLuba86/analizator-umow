@@ -24,7 +24,7 @@ flowchart LR
 | Element | Obraz / konfiguracja | Uwagi |
 |---|---|---|
 | `db` | `postgres:16`, wolumen `pgdata`, healthcheck `pg_isready` | backend startuje po `service_healthy` |
-| `backend` | `backend/Dockerfile`: Python 3.12, `uv sync --frozen --no-dev`, użytkownik bez uprawnień `appuser`; zawiera `alembic.ini` i migracje; przy starcie `alembic upgrade head`, potem uvicorn | konfiguracja z `.env`; wzorce klauzul z `data/wzorce` montowanych tylko do odczytu; `restart: unless-stopped` |
+| `backend` | `backend/Dockerfile`: Python 3.14, `uv sync --frozen --no-dev`, użytkownik bez uprawnień `appuser`; zawiera `alembic.ini` i migracje; przy starcie `alembic upgrade head`, potem uvicorn | konfiguracja z `.env`; wzorce klauzul z `data/wzorce` montowanych tylko do odczytu; `restart: unless-stopped` |
 | `frontend` | `frontend/Dockerfile`: build Vite, serwowany przez `nginx-unprivileged` (bez roota, port 8080) | CSP, proxy `/api/` do `backend:8000` z nagłówkiem `Host` zawierającym port, limit ciała 1 MB, limit logowania 10/min na IP |
 
 ## Uruchomienie

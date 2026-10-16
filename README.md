@@ -22,7 +22,7 @@ prawnych.
 - Klucz API Anthropic (`ANTHROPIC_API_KEY`). Bez klucza aplikacja działa, ale każda analiza kończy
   się kwarantanną (klasyfikator niedostępny).
 - Do testów lokalnych (opcjonalnie):
-  - [uv](https://docs.astral.sh/uv/) z Pythonem 3.12;
+  - [uv](https://docs.astral.sh/uv/) z Pythonem 3.14;
   - Node.js 22.
 
 ## Uruchomienie od zera
