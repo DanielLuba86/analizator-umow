@@ -42,15 +42,15 @@ Pozycje: B1, B2, B3, B5, B6, B7, B11 (część nginx), B20, C11.
 
 **Pliki:** `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`, `docker-compose.yml`, `.env.example`, `.github/workflows/ci.yml`, `.github/dependabot.yml` (nowy), `scripts/check_docs.py`, `backend/tests/scripts/test_checkers.py`, `README.md`.
 
-- [ ] **Krok 1:** `backend/Dockerfile`: `ghcr.io/astral-sh/uv:<wersja>@sha256:<digest>` (wersja zgodna z `uv --version` używanym w CI; digest z `docker buildx imagetools inspect`).
-- [ ] **Krok 2:** `frontend/Dockerfile`: `FROM nginxinc/nginx-unprivileged:1.27-alpine`; `nginx.conf`: `listen 8080;`, `proxy_set_header Host $http_host;`, `client_max_body_size 1m;`, na początku pliku `limit_req_zone $binary_remote_addr zone=login:10m rate=10r/m;`, osobna `location = /api/auth/login { limit_req zone=login burst=5 nodelay; limit_req_status 429; proxy_pass … }` (te same nagłówki proxy co `/api/`).
-- [ ] **Krok 3:** `docker-compose.yml`: frontend `"8080:8080"`; usunąć `ports` backendu (B5).
-- [ ] **Krok 4:** `.env.example`: komentarz nad `DATABASE_URL`, że hasło musi być równe `POSTGRES_PASSWORD`. README: usunąć zdanie o `http://localhost:8000`; dodać akapit, że za TLS ustawia się `COOKIE_SECURE=true` (B20).
-- [ ] **Krok 5:** `ci.yml`: `concurrency: {group: ci-${{ github.ref }}, cancel-in-progress: true}`, `timeout-minutes: 15` na każdym jobie, `enable-cache: true` w `setup-uv`. `.github/dependabot.yml`: ekosystemy `github-actions` (/), `uv` (/backend), `npm` (/frontend), `docker` (/backend, /frontend), interwał `weekly`.
-- [ ] **Krok 6 (test):** `test_checkers.py::test_mermaid_timeout_reported_as_error`: podmieniony `subprocess.run` rzuca `TimeoutExpired`, a wynik `check_docs` zawiera błąd z nazwą pliku i słowem „timeout”. RED.
-- [ ] **Krok 7:** `scripts/check_docs.py`: `subprocess.run(..., timeout=120)`, `TimeoutExpired` → błąd. GREEN.
-- [ ] **Krok 8 (weryfikacja):** `docker compose up --build -d`; `curl -s localhost:8080/api/health` → `{"status":"ok"}`; `curl -s localhost:8000` → connection refused; `docker compose exec frontend id -u` ≠ 0.
-- [ ] **Krok 9:** commit „Przypnij obrazy, uruchom nginx bez roota i uszczelnij CI”.
+- [x] **Krok 1:** `backend/Dockerfile`: `ghcr.io/astral-sh/uv:<wersja>@sha256:<digest>` (wersja zgodna z `uv --version` używanym w CI; digest z `docker buildx imagetools inspect`).
+- [x] **Krok 2:** `frontend/Dockerfile`: `FROM nginxinc/nginx-unprivileged:1.27-alpine`; `nginx.conf`: `listen 8080;`, `proxy_set_header Host $http_host;`, `client_max_body_size 1m;`, na początku pliku `limit_req_zone $binary_remote_addr zone=login:10m rate=10r/m;`, osobna `location = /api/auth/login { limit_req zone=login burst=5 nodelay; limit_req_status 429; proxy_pass … }` (te same nagłówki proxy co `/api/`).
+- [x] **Krok 3:** `docker-compose.yml`: frontend `"8080:8080"`; usunąć `ports` backendu (B5).
+- [x] **Krok 4:** `.env.example`: komentarz nad `DATABASE_URL`, że hasło musi być równe `POSTGRES_PASSWORD`. README: usunąć zdanie o `http://localhost:8000`; dodać akapit, że za TLS ustawia się `COOKIE_SECURE=true` (B20).
+- [x] **Krok 5:** `ci.yml`: `concurrency: {group: ci-${{ github.ref }}, cancel-in-progress: true}`, `timeout-minutes: 15` na każdym jobie, `enable-cache: true` w `setup-uv`. `.github/dependabot.yml`: ekosystemy `github-actions` (/), `uv` (/backend), `npm` (/frontend), `docker` (/backend, /frontend), interwał `weekly`.
+- [x] **Krok 6 (test):** `test_checkers.py::test_mermaid_timeout_reported_as_error`: podmieniony `subprocess.run` rzuca `TimeoutExpired`, a wynik `check_docs` zawiera błąd z nazwą pliku i słowem „timeout”. RED.
+- [x] **Krok 7:** `scripts/check_docs.py`: `subprocess.run(..., timeout=120)`, `TimeoutExpired` → błąd. GREEN.
+- [x] **Krok 8 (weryfikacja):** `docker compose up --build -d`; `curl -s localhost:8080/api/health` → `{"status":"ok"}`; `curl -s localhost:8000` → connection refused; `docker compose exec frontend id -u` ≠ 0.
+- [x] **Krok 9:** commit „Przypnij obrazy, uruchom nginx bez roota i uszczelnij CI”.
 
 ### Task 2: Schemat i repozytoria
 
@@ -64,11 +64,11 @@ Pozycje: B8, B9, B10 (bez c), A10 (repo), A11 (kolumna), B17 (repo).
 - kolumna `analyses.agent_reason: str | None` (TEXT NULL).
 - `delete_expired_sessions(session, now: datetime) -> int` w `security/sessions.py`.
 
-- [ ] **Krok 1 (testy, RED):** `test_claim_analysis_only_from_queued` (drugi `claim` → `False`); `test_set_status_rejects_done_to_running`; `test_recovery_and_quarantine_decisions_still_allowed` (running→failed, quarantined→done, quarantined→failed); `test_add_template_version_concurrent` w `test_concurrency.py` (dwa połączenia, obie wersje zapisane z numerami 1 i 2, bez `IntegrityError`); `test_delete_expired_sessions_keeps_live`; `test_child_fk_columns_indexed` (inspektor SQLAlchemy: indeks na `findings.analysis_id`, `rejected_claims.analysis_id`, `analyses.version_id`, `fragments.version_id`, `comparisons.version_a`, `comparisons.version_b`, `exports.action_id`, `sessions.user_id`, plus każda inna kolumna FK bez indeksu, którą znajdzie inspektor); B9: test kaskady filtruje po id usuniętej umowy, a druga umowa utworzona w teście zostaje nietknięta.
-- [ ] **Krok 2:** migracja `0002`: indeksy `ix_<tabela>_<kolumna>`, kolumna `agent_reason`; `downgrade` odwraca. `models.py`: `index=True` na tych kolumnach, jawne `ondelete="CASCADE"` w `comparisons.version_a/b` i `exports.action_id`, `agent_reason`. `env.py`: `engine_from_config(..., poolclass=pool.NullPool)`.
-- [ ] **Krok 3:** `add_template_version`: `SELECT … FOR UPDATE` na wierszu klauzuli (szablonu nadrzędnego) przed `max+1`; usunąć zbędne `or 0`.
-- [ ] **Krok 4 (GREEN):** pełny `pytest`, `alembic upgrade head && alembic downgrade base && alembic upgrade head` na czystej bazie testowej.
-- [ ] **Krok 5:** commit „Dodaj indeksy kluczy obcych, walidację przejść statusu i blokadę wersji wzorca”.
+- [x] **Krok 1 (testy, RED):** `test_claim_analysis_only_from_queued` (drugi `claim` → `False`); `test_set_status_rejects_done_to_running`; `test_recovery_and_quarantine_decisions_still_allowed` (running→failed, quarantined→done, quarantined→failed); `test_add_template_version_concurrent` w `test_concurrency.py` (dwa połączenia, obie wersje zapisane z numerami 1 i 2, bez `IntegrityError`); `test_delete_expired_sessions_keeps_live`; `test_child_fk_columns_indexed` (inspektor SQLAlchemy: indeks na `findings.analysis_id`, `rejected_claims.analysis_id`, `analyses.version_id`, `fragments.version_id`, `comparisons.version_a`, `comparisons.version_b`, `exports.action_id`, `sessions.user_id`, plus każda inna kolumna FK bez indeksu, którą znajdzie inspektor); B9: test kaskady filtruje po id usuniętej umowy, a druga umowa utworzona w teście zostaje nietknięta.
+- [x] **Krok 2:** migracja `0002`: indeksy `ix_<tabela>_<kolumna>`, kolumna `agent_reason`; `downgrade` odwraca. `models.py`: `index=True` na tych kolumnach, jawne `ondelete="CASCADE"` w `comparisons.version_a/b` i `exports.action_id`, `agent_reason`. `env.py`: `engine_from_config(..., poolclass=pool.NullPool)`.
+- [x] **Krok 3:** `add_template_version`: `SELECT … FOR UPDATE` na wierszu klauzuli (szablonu nadrzędnego) przed `max+1`; usunąć zbędne `or 0`.
+- [x] **Krok 4 (GREEN):** pełny `pytest`, `alembic upgrade head && alembic downgrade base && alembic upgrade head` na czystej bazie testowej.
+- [x] **Krok 5:** commit „Dodaj indeksy kluczy obcych, walidację przejść statusu i blokadę wersji wzorca”.
 
 ### Task 3: Agent i serwis analizy
 
@@ -78,7 +78,7 @@ Pozycje: A5–A16 (bez A15b), A10/A11 (serwis).
 
 **Interfejsy:** konsumuje `claim_analysis`, `agent_reason` (zadanie 2). Produkuje `TOOL_NAMES: tuple[str, ...]` w `tools.py` (jedyne źródło; `fake_runner` i `sdk_runner` importują) oraz `run_analysis(analysis_id: int, *, request_id: str | None = None)` (używane w zadaniu 5).
 
-- [ ] **Krok 1 (testy, RED):**
+- [x] **Krok 1 (testy, RED):**
   - `test_run_analysis_twice_does_not_duplicate_findings`: drugi `run_analysis` nic nie robi, bo `claim` zwraca `False`.
   - `test_quarantine_keeps_agent_reason`: `analyses.reason == <powód kwarantanny>`, `agent_reason == outcome.reason`.
   - `test_integrity_error_other_than_fk_is_not_template_hint`.
@@ -95,10 +95,10 @@ Pozycje: A5–A16 (bez A15b), A10/A11 (serwis).
   - `test_agent_env_blanks_everything_but_allowlist`: każdy klucz z `os.environ` poza `{"PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR"}` ma wartość `""`, a `ANTHROPIC_API_KEY` jest ustawiony.
   - `test_closed_options_not_shared`: mutacja zwróconego słownika nie wpływa na kolejne wywołanie.
   - `test_run_analysis_binds_request_id` (structlog `capture_logs`: wpisy z analizy mają `request_id`).
-- [ ] **Krok 2:** implementacja. A5: `isinstance(e.orig, psycopg.errors.ForeignKeyViolation)` → podpowiedź o szablonie, inne błędy propagują. A14: w transakcji count+insert najpierw `SELECT … FROM analyses WHERE id=:id FOR UPDATE`. A15: `_CLOSED` jako `MappingProxyType` lub kopia; narzędzia wołają repo przez `await asyncio.to_thread(...)`. A16: zastąpić regex `_INHERITED_SECRET` listą dozwolonych z testu.
-- [ ] **Krok 3 (GREEN):** pełny `pytest`.
-- [ ] **Krok 4 (weryfikacja, bez kosztów):** powtórzyć próbę inicjalizacji z fałszywym kluczem (procedura Task 4.3 z `progress.md`). Komunikat `init` musi zawierać dokładnie 5 narzędzi `mcp__umowy__*`, a wynik to `failed/api_error`.
-- [ ] **Krok 5:** commit „Uszczelnij agenta: lista dozwolonych zmiennych, jednokrotny start analizy, dokładniejsze powody błędów”.
+- [x] **Krok 2:** implementacja. A5: `isinstance(e.orig, psycopg.errors.ForeignKeyViolation)` → podpowiedź o szablonie, inne błędy propagują. A14: w transakcji count+insert najpierw `SELECT … FROM analyses WHERE id=:id FOR UPDATE`. A15: `_CLOSED` jako `MappingProxyType` lub kopia; narzędzia wołają repo przez `await asyncio.to_thread(...)`. A16: zastąpić regex `_INHERITED_SECRET` listą dozwolonych z testu.
+- [x] **Krok 3 (GREEN):** pełny `pytest`.
+- [x] **Krok 4 (weryfikacja, bez kosztów):** powtórzyć próbę inicjalizacji z fałszywym kluczem (procedura Task 4.3 z `progress.md`). Komunikat `init` musi zawierać dokładnie 5 narzędzi `mcp__umowy__*`, a wynik to `failed/api_error`.
+- [x] **Krok 5:** commit „Uszczelnij agenta: lista dozwolonych zmiennych, jednokrotny start analizy, dokładniejsze powody błędów”.
 
 ### Task 4: Domena
 
@@ -106,9 +106,9 @@ Pozycje: A1, A2, A3, A4 (a, b, d).
 
 **Pliki:** `backend/app/domain/quotes.py`, `injection.py`, `diff.py`, `backend/tests/domain/*`.
 
-- [ ] **Krok 1 (testy, RED):** `test_negative_min_len_rejected` (`ValueError`); `test_nfc_text_nfd_quote` i `test_nfd_text_nfc_quote` (oba kierunki, poprawione nazwy zmiennych); `test_case_and_typography_must_match` sprawdza `exc.value.reason`; `test_if_double_space_you_are_now_not_flagged`, `test_if_comma_you_are_now_not_flagged`, `test_you_are_now_still_flagged`; `test_diff_fragments_duplicate_labels_rejected` (`ValueError`; etykiety są unikalne zgodnie z R7, więc duplikat oznacza błąd wywołującego); `test_diff_findings_returns_original_quote`.
-- [ ] **Krok 2:** `_HINTS: Mapping[RejectReason, str]`; walidacja `min_len >= 0`. W `injection.py` usunąć lookbehind i odrzucać trafienie, gdy `re.search(r"\bif[\s,]*$", text[max(0, start - 20):start], re.IGNORECASE)`. A3: `bisect_right` po posortowanych `start` fragmentów. A4: rozpakowanie krotki z `normalize_whitespace` zamiast indeksu `[0]`.
-- [ ] **Krok 3 (GREEN)** i commit „Popraw heurystykę wstrzyknięć i walidację cytatów”.
+- [x] **Krok 1 (testy, RED):** `test_negative_min_len_rejected` (`ValueError`); `test_nfc_text_nfd_quote` i `test_nfd_text_nfc_quote` (oba kierunki, poprawione nazwy zmiennych); `test_case_and_typography_must_match` sprawdza `exc.value.reason`; `test_if_double_space_you_are_now_not_flagged`, `test_if_comma_you_are_now_not_flagged`, `test_you_are_now_still_flagged`; `test_diff_fragments_duplicate_labels_rejected` (`ValueError`; etykiety są unikalne zgodnie z R7, więc duplikat oznacza błąd wywołującego); `test_diff_findings_returns_original_quote`.
+- [x] **Krok 2:** `_HINTS: Mapping[RejectReason, str]`; walidacja `min_len >= 0`. W `injection.py` usunąć lookbehind i odrzucać trafienie, gdy `re.search(r"\bif[\s,]*$", text[max(0, start - 20):start], re.IGNORECASE)`. A3: `bisect_right` po posortowanych `start` fragmentów. A4: rozpakowanie krotki z `normalize_whitespace` zamiast indeksu `[0]`.
+- [x] **Krok 3 (GREEN)** i commit „Popraw heurystykę wstrzyknięć i walidację cytatów”.
 
 ### Task 5: API
 
@@ -118,7 +118,7 @@ Pozycje: B4, B11 (aplikacja), B13, B14, B15, B16, B17 (wywołanie), B18, B19 (wy
 
 **Interfejsy (produkuje):** `GET /api/actions?analysis_id=<int>` (opcjonalny, łączy się z `status`); `Settings.max_body_bytes: int = 1_048_576`, `Settings.max_active_analyses: int = 5`.
 
-- [ ] **Krok 1 (testy, RED):**
+- [x] **Krok 1 (testy, RED):**
   - `test_settings_defaults` (przypina obecne wartości domyślne, w tym `cookie_secure`) i `test_settings_env_override`.
   - `test_body_over_limit_413_before_parsing`: `Content-Length` > `max_body_bytes` → 413 problem+json.
   - `test_post_with_foreign_origin_403`, `test_post_with_matching_origin_ok` (`Origin: http://localhost:8080`, `Host: localhost:8080`), `test_post_without_origin_ok`, `test_get_with_foreign_origin_ok`.
@@ -130,9 +130,9 @@ Pozycje: B4, B11 (aplikacja), B13, B14, B15, B16, B17 (wywołanie), B18, B19 (wy
   - `test_export_headers` (`X-Content-Type-Options: nosniff`, `Cache-Control: no-store`).
   - `test_list_actions_filter_by_analysis`.
   - `test_background_analysis_logs_request_id`.
-- [ ] **Krok 2:** implementacja. Middleware w `api/middleware.py`: limit rozmiaru i sprawdzenie Origin dla `POST`/`PUT`/`PATCH`/`DELETE` (porównanie `urlsplit(origin).netloc == request.headers["host"]`; brak `Origin` przepuszcza). B13: singletony zamienione na funkcje-fabryki. B14: `threading.Lock` w `get_session_factory`. Analizę w tle wywołuje się z `request_id`.
-- [ ] **Krok 3 (GREEN):** pełny `pytest`. Uruchomić `npx vitest run`, bo frontend może zakładać 201.
-- [ ] **Krok 4:** commit „Dodaj limit rozmiaru żądania, kontrolę Origin i globalny limit analiz w API”.
+- [x] **Krok 2:** implementacja. Middleware w `api/middleware.py`: limit rozmiaru i sprawdzenie Origin dla `POST`/`PUT`/`PATCH`/`DELETE` (porównanie `urlsplit(origin).netloc == request.headers["host"]`; brak `Origin` przepuszcza). B13: singletony zamienione na funkcje-fabryki. B14: `threading.Lock` w `get_session_factory`. Analizę w tle wywołuje się z `request_id`.
+- [x] **Krok 3 (GREEN):** pełny `pytest`. Uruchomić `npx vitest run`, bo frontend może zakładać 201.
+- [x] **Krok 4:** commit „Dodaj limit rozmiaru żądania, kontrolę Origin i globalny limit analiz w API”.
 
 ### Task 6: Frontend
 
@@ -140,7 +140,7 @@ Pozycje: C1–C9, C4 (przełączenie na filtr z zadania 5).
 
 **Pliki:** `frontend/src/pages/ContractPage.tsx`, `frontend/src/document/RiskReport.tsx`, `DocumentView.tsx`, `frontend/src/App.tsx`, `frontend/src/pages/NotFoundPage.tsx` (nowy), `frontend/src/pages/textFile.ts`, `frontend/eslint.config.js`, `frontend/src/styles.css`, `frontend/tests/*`.
 
-- [ ] **Krok 1 (testy, RED):**
+- [x] **Krok 1 (testy, RED):**
   - `quarantine banner has refresh button that reloads analysis`.
   - `analysis error is announced` (`role="alert"`).
   - `repeated click on overlapping highlight cycles findings` (kolejne kliknięcia: id1 → id2 → id1).
@@ -152,9 +152,9 @@ Pozycje: C1–C9, C4 (przełączenie na filtr z zadania 5).
   - `asystent typing #/approvals sees no approvals`.
   - `errorMessage without request id`.
   - `double click submits once` (logowanie, decyzja, start analizy).
-- [ ] **Krok 2:** implementacja. Stała `MAX_CONTRACT_CHARS = 200_000`, próg bajtów `4 * MAX_CONTRACT_CHARS`. ESLint: `"react/forbid-dom-props": ["error", { forbid: ["style"] }]`.
-- [ ] **Krok 3 (GREEN):** `npm run lint && npx tsc --noEmit && npx vitest run`.
-- [ ] **Krok 4:** commit „Dodaj odświeżanie kwarantanny, stronę 404 i limit rozmiaru pliku we frontendzie”.
+- [x] **Krok 2:** implementacja. Stała `MAX_CONTRACT_CHARS = 200_000`, próg bajtów `4 * MAX_CONTRACT_CHARS`. ESLint: `"react/forbid-dom-props": ["error", { forbid: ["style"] }]`.
+- [x] **Krok 3 (GREEN):** `npm run lint && npx tsc --noEmit && npx vitest run`.
+- [x] **Krok 4:** commit „Dodaj odświeżanie kwarantanny, stronę 404 i limit rozmiaru pliku we frontendzie”.
 
 ### Task 7: Dokumentacja
 
@@ -162,12 +162,12 @@ Pozycje: C10 oraz dokumentacja nowych zabezpieczeń.
 
 **Pliki:** `docs/threat-model.md`, `docs/arc42/07-wdrozenie.md`, `08-koncepcje-przekrojowe.md`, `11-ryzyka-i-dlug-techniczny.md`.
 
-- [ ] **Krok 1:** T18 linkuje `api/contracts.py`, `repo/analyses.py` i middleware. Nowe obrony z linkami do testów z zadań 1–6: rate limit logowania (nginx, `ci:` niedostępne, więc opis ręcznej weryfikacji), Origin, globalny limit analiz, lista dozwolonych zmiennych agenta. Usunąć ryzyko szczątkowe T15 dotyczące listy zabronionych. arc42 §7: nginx bez roota na porcie 8080, backend niedostępny z hosta. §11: usunąć spłacone pozycje długu.
-- [ ] **Krok 2 (weryfikacja):** `python3 scripts/check_docs.py` → 0 błędów; `cd backend && uv run python ../scripts/check_threat_model.py` → 0 błędów.
-- [ ] **Krok 3:** commit „Zaktualizuj model zagrożeń i arc42 po poprawkach”.
+- [x] **Krok 1:** T18 linkuje `api/contracts.py`, `repo/analyses.py` i middleware. Nowe obrony z linkami do testów z zadań 1–6: rate limit logowania (nginx, `ci:` niedostępne, więc opis ręcznej weryfikacji), Origin, globalny limit analiz, lista dozwolonych zmiennych agenta. Usunąć ryzyko szczątkowe T15 dotyczące listy zabronionych. arc42 §7: nginx bez roota na porcie 8080, backend niedostępny z hosta. §11: usunąć spłacone pozycje długu.
+- [x] **Krok 2 (weryfikacja):** `python3 scripts/check_docs.py` → 0 błędów; `cd backend && uv run python ../scripts/check_threat_model.py` → 0 błędów.
+- [x] **Krok 3:** commit „Zaktualizuj model zagrożeń i arc42 po poprawkach”.
 
 ### Task 8: Weryfikacja końcowa i PR
 
-- [ ] **Krok 1:** świeży klon, README krok po kroku z nowym `COMPOSE_PROJECT_NAME` (nowy wolumen). Playwright: asystent wgrywa `jawne_polecenie.md` → kwarantanna → prawnik zatwierdza → asystent klika „Odśwież” → 2 podświetlenia. Logowanie przez UI działa (Origin za nginx). 20 szybkich `POST /api/auth/login` → co najmniej jedno 429.
-- [ ] **Krok 2:** przegląd całej gałęzi, poprawki, wpis w `progress.md`.
-- [ ] **Krok 3:** PR „Odłożone poprawki z przeglądów faz 1–7”, CI zielone. Merge dopiero po decyzji użytkownika.
+- [x] **Krok 1:** świeży klon, README krok po kroku z nowym `COMPOSE_PROJECT_NAME` (nowy wolumen). Playwright: asystent wgrywa `jawne_polecenie.md` → kwarantanna → prawnik zatwierdza → asystent klika „Odśwież” → 2 podświetlenia. Logowanie przez UI działa (Origin za nginx). 20 szybkich `POST /api/auth/login` → co najmniej jedno 429.
+- [x] **Krok 2:** przegląd całej gałęzi, poprawki, wpis w `progress.md`.
+- [x] **Krok 3:** PR „Odłożone poprawki z przeglądów faz 1–7”, CI zielone. Merge dopiero po decyzji użytkownika.
