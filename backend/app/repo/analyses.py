@@ -78,6 +78,12 @@ def set_status(
     s.flush()
 
 
+def set_agent_reason(s: Session, analysis_id: int, reason: str | None) -> None:
+    a = s.execute(select(Analysis).where(Analysis.id == analysis_id)).scalar_one()
+    a.agent_reason = reason
+    s.flush()
+
+
 def claim_analysis(s: Session, analysis_id: int) -> bool:
     """queued → running atomowo; False, gdy analizę już ktoś uruchomił (lub zakończył)."""
     result = s.execute(

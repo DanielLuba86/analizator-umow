@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import structlog.contextvars
 import structlog.testing
 from db_env import Env
 from sqlalchemy import select
@@ -300,3 +301,47 @@ async def test_error_after_classifier_unavailable_still_quarantines(env: Env) ->
     a = analysis_row(env, aid)
     assert (a.status, a.reason) == ("quarantined", "klasyfikator_niedostępny")
     assert pending(env, aid) == [("kwarantanna", {"powód": "klasyfikator_niedostępny"})]
+
+
+async def test_run_analysis_twice_does_not_duplicate_findings(env: Env) -> None:
+    aid = new_analysis(env, CLEAN)
+    fid = fragment_of(env, aid, CLEAN_QUOTE)
+    script = [finding_call(CLEAN_QUOTE, fid)]
+    await go(env, aid, runner=fake_runner(script))
+    before = analysis_row(env, aid)
+    with structlog.testing.capture_logs() as logs:
+        await go(env, aid, runner=fake_runner(script))
+    after = analysis_row(env, aid)
+    assert [e["event"] for e in logs] == ["analysis_already_started"]
+    assert len(findings(env, aid)) == 1
+    assert (after.status, after.finished_at) == (before.status, before.finished_at)
+
+
+async def test_quarantine_keeps_agent_reason(env: Env) -> None:
+    aid = new_analysis(env, CLEAN)
+    fid = fragment_of(env, aid, CLEAN_QUOTE)
+    script = [finding_call(CLEAN_QUOTE, fid, typ="wstrzyknięcie"), ToolCall("list_fragments")]
+    await go(env, aid, runner=fake_runner(script, max_turns=1))
+    a = analysis_row(env, aid)
+    assert (a.status, a.reason, a.agent_reason) == ("quarantined", "wstrzyknięcie", "turns")
+
+
+async def test_run_analysis_binds_request_id(env: Env) -> None:
+    aid = new_analysis(env, CLEAN)
+    seen: dict[str, Any] = {}
+
+    class Peek:
+        async def run(self, ctx: AnalysisContext, tools: AgentTools) -> RunOutcome:
+            seen.update(structlog.contextvars.get_contextvars())
+            return RunOutcome("done", 1, 0.0, None)
+
+    await run_analysis(
+        aid,
+        session_factory=env.sf,
+        runner=Peek(),
+        classifier=FakeClassifier([]),
+        settings=SETTINGS,
+        request_id="req-123",
+    )
+    assert seen.get("request_id") == "req-123"
+    assert "request_id" not in structlog.contextvars.get_contextvars()

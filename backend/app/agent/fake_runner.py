@@ -8,15 +8,11 @@ from typing import Any
 from app.agent.context import AnalysisContext
 from app.agent.guard import BudgetExceeded, LoopGuard
 from app.agent.runner import RunOutcome
-from app.agent.tools import AgentTools
+from app.agent.tools import TOOL_NAMES, AgentTools
 
-TOOL_NAMES = (
-    "list_fragments",
-    "read_fragment",
-    "search_templates",
-    "submit_finding",
-    "request_action",
-)
+
+class _ToolTimeout(Exception):
+    """TimeoutError rzucony przez narzędzie — błąd narzędzia, nie przekroczenie czasu przebiegu."""
 
 
 @dataclass(frozen=True)
@@ -41,10 +37,13 @@ class FakeAgentRunner:
 
     async def _play(self, tools: AgentTools, guard: LoopGuard) -> None:
         for call in self._script:
-            guard.on_turn(call.cost_usd)
             if call.name not in TOOL_NAMES:
                 raise LookupError("unknown tool in script")
-            await getattr(tools, call.name)(**call.args)
+            guard.on_turn(call.cost_usd)
+            try:
+                await getattr(tools, call.name)(**call.args)
+            except TimeoutError as e:
+                raise _ToolTimeout from e
 
     async def run(self, ctx: AnalysisContext, tools: AgentTools) -> RunOutcome:
         guard = LoopGuard(self._max_turns, self._max_budget_usd)
@@ -52,6 +51,8 @@ class FakeAgentRunner:
             await asyncio.wait_for(self._play(tools, guard), timeout=self._timeout_s)
         except TimeoutError:
             return RunOutcome("budget_exceeded", guard.turns, guard.cost_usd, "timeout")
+        except _ToolTimeout:
+            return RunOutcome("failed", guard.turns, guard.cost_usd, "TimeoutError")
         except BudgetExceeded as e:
             return RunOutcome("budget_exceeded", guard.turns, guard.cost_usd, e.kind)
         except Exception as e:  # noqa: BLE001 - powód to tylko nazwa klasy, nigdy treść

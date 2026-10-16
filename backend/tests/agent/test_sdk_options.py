@@ -126,26 +126,24 @@ def test_options_limits_from_settings() -> None:
     assert opts.max_budget_usd == 0.25
 
 
-def test_env_sets_only_api_key_and_blanks_inherited_secrets(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """SDK dokleja os.environ do procesu CLI; nadpisujemy sekrety pustymi wartościami."""
+def test_agent_env_blanks_everything_but_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SDK dokleja os.environ do procesu CLI; przepuszczamy tylko listę dozwolonych zmiennych."""
     for name in list(os.environ):
         monkeypatch.delenv(name)
     monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("HOME", "/home/app")
+    monkeypatch.setenv("LANG", "C.UTF-8")
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:haslo@db/x")
     monkeypatch.setenv("SEED_LAWYER_PASSWORD", "haslo")
-    monkeypatch.setenv("POSTGRES_PASSWORD", "haslo")
-    monkeypatch.setenv("SOME_API_SECRET", "x")
-    monkeypatch.setenv("GH_TOKEN", "x")
+    monkeypatch.setenv("PGPASS", "haslo")  # nazwa bez PASSWORD/SECRET/TOKEN
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "x")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "klucz-z-otoczenia")
     assert _options().env == {
         "ANTHROPIC_API_KEY": "sk-test-klucz",
         "DATABASE_URL": "",
         "SEED_LAWYER_PASSWORD": "",
-        "POSTGRES_PASSWORD": "",
-        "SOME_API_SECRET": "",
-        "GH_TOKEN": "",
+        "PGPASS": "",
+        "AWS_ACCESS_KEY_ID": "",
     }
 
 
@@ -272,10 +270,10 @@ async def test_run_fails_closed_when_init_has_no_tools_list() -> None:
     assert out.reason == "niezgodny_zestaw_narzedzi"
 
 
-async def test_run_fails_closed_when_result_arrives_before_init() -> None:
+async def test_result_before_init_is_brak_init() -> None:
     runner = SdkAgentRunner(_settings(), query_fn=fake_query([_result("success")], {}))
     out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
-    assert out.reason == "niezgodny_zestaw_narzedzi"
+    assert (out.status, out.reason) == ("failed", "brak_init")
 
 
 async def test_run_success_passes_prompt_and_maps_result() -> None:
@@ -303,6 +301,32 @@ async def test_run_timeout_is_budget_exceeded() -> None:
     runner = SdkAgentRunner(_settings(), query_fn=slow, timeout_s=0.05)
     out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
     assert (out.status, out.reason) == ("budget_exceeded", "timeout")
+
+
+async def test_timeout_records_turns_seen() -> None:
+    async def slow(*, prompt: str, options: ClaudeAgentOptions) -> AsyncIterator[Message]:
+        yield _init(ALLOWED_TOOLS)
+        yield AssistantMessage(content=[TextBlock("a")], model="m")
+        yield AssistantMessage(content=[TextBlock("b")], model="m")
+        await asyncio.sleep(10)
+
+    runner = SdkAgentRunner(_settings(), query_fn=slow, timeout_s=0.05)
+    out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
+    assert (out.status, out.reason, out.turns) == ("budget_exceeded", "timeout", 2)
+
+
+async def test_missing_api_key_fails_with_brak_klucza() -> None:
+    runner = SdkAgentRunner(_settings(anthropic_api_key=None), query_fn=fake_query([], {}))
+    out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
+    assert (out.status, out.reason) == ("failed", "brak_klucza_api")
+
+
+async def test_closed_result_not_shared() -> None:
+    handlers = {t.name: t.handler for t in build_sdk_tools(RecordingTools(), gate=lambda: False)}  # type: ignore[arg-type]
+    first = await handlers["list_fragments"]({})
+    first["content"][0]["text"] = "zmienione"
+    second = await handlers["list_fragments"]({})
+    assert second["content"][0]["text"] == "Narzędzia są niedostępne."
 
 
 async def test_sdk_error_reason_is_class_name_without_message() -> None:

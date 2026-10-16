@@ -8,7 +8,6 @@ w komunikacie ``init`` jest sprawdzany przed pierwszą turą (fail-closed).
 import argparse
 import asyncio
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -19,6 +18,7 @@ from typing import Any, Literal
 
 import structlog
 from claude_agent_sdk import (
+    AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKError,
     McpSdkServerConfig,
@@ -34,29 +34,45 @@ from claude_agent_sdk import (
 from app.agent.context import AnalysisContext
 from app.agent.prompt import SYSTEM_PROMPT
 from app.agent.runner import RunOutcome
-from app.agent.tools import AgentTools, ToolResult
+from app.agent.tools import TOOL_NAMES, AgentTools, ToolResult
 from app.config import Settings
 from app.domain.model import CONTRACT_KINDS
 
 SERVER_NAME = "umowy"
-_TOOL_NAMES = (
-    "list_fragments",
-    "read_fragment",
-    "search_templates",
-    "submit_finding",
-    "request_action",
-)
-ALLOWED_TOOLS = [f"mcp__{SERVER_NAME}__{name}" for name in _TOOL_NAMES]
+ALLOWED_TOOLS = [f"mcp__{SERVER_NAME}__{name}" for name in TOOL_NAMES]
 TOOLSET_MISMATCH = "niezgodny_zestaw_narzedzi"
+NO_INIT = "brak_init"
+NO_API_KEY = "brak_klucza_api"
 
 # SDK dokleja os.environ procesu do środowiska CLI; options.env może tylko nadpisywać,
-# więc dziedziczone sekrety (baza, hasła seed, tokeny) zastępujemy pustymi wartościami.
-_INHERITED_SECRET = re.compile(r"^DATABASE_URL$|^SEED_|PASSWORD|SECRET|TOKEN", re.IGNORECASE)
+# więc każdą dziedziczoną zmienną spoza tej listy zastępujemy pustą wartością.
+# Lista obejmuje to, czego CLI potrzebuje do startu i połączenia (ścieżki, locale, proxy, CA).
+ENV_ALLOWLIST = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TZ",
+        "TMPDIR",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "NODE_EXTRA_CA_CERTS",
+    }
+)
 
 QueryFn = Callable[..., AsyncIterator[Message]]
 Gate = Callable[[], bool]
 
 log = structlog.get_logger(__name__)
+
+
+class _NoInit(Exception):
+    """Strumień nie zaczął się od komunikatu init — zestawu narzędzi nie da się sprawdzić."""
 
 
 class UnexpectedToolset(Exception):
@@ -86,10 +102,9 @@ def _schema(properties: dict[str, Any], required: Sequence[str]) -> dict[str, An
     }
 
 
-_CLOSED: ToolResult = {
-    "content": [{"type": "text", "text": "Narzędzia są niedostępne."}],
-    "is_error": True,
-}
+def _closed_result() -> ToolResult:
+    """Nowy obiekt przy każdym wywołaniu — SDK mógłby zmodyfikować współdzielony słownik."""
+    return {"content": [{"type": "text", "text": "Narzędzia są niedostępne."}], "is_error": True}
 
 
 def build_sdk_tools(tools: AgentTools, gate: Gate | None = None) -> list[SdkMcpTool[Any]]:
@@ -104,7 +119,7 @@ def build_sdk_tools(tools: AgentTools, gate: Gate | None = None) -> list[SdkMcpT
         _schema({}, []),
     )
     async def list_fragments(args: dict[str, Any]) -> ToolResult:
-        return _CLOSED if closed() else await tools.list_fragments()
+        return _closed_result() if closed() else await tools.list_fragments()
 
     @tool(
         "read_fragment",
@@ -112,7 +127,11 @@ def build_sdk_tools(tools: AgentTools, gate: Gate | None = None) -> list[SdkMcpT
         _schema({"fragment_id": _str("id fragmentu z list_fragments")}, ["fragment_id"]),
     )
     async def read_fragment(args: dict[str, Any]) -> ToolResult:
-        return _CLOSED if closed() else await tools.read_fragment(fragment_id=args["fragment_id"])
+        return (
+            _closed_result()
+            if closed()
+            else await tools.read_fragment(fragment_id=args["fragment_id"])
+        )
 
     @tool(
         "search_templates",
@@ -121,7 +140,7 @@ def build_sdk_tools(tools: AgentTools, gate: Gate | None = None) -> list[SdkMcpT
     )
     async def search_templates(args: dict[str, Any]) -> ToolResult:
         return (
-            _CLOSED
+            _closed_result()
             if closed()
             else await tools.search_templates(kind=args["kind"], query=args["query"])
         )
@@ -153,7 +172,7 @@ def build_sdk_tools(tools: AgentTools, gate: Gate | None = None) -> list[SdkMcpT
     )
     async def submit_finding(args: dict[str, Any]) -> ToolResult:
         if closed():
-            return _CLOSED
+            return _closed_result()
         return await tools.submit_finding(
             typ=args["typ"],
             teza=args["teza"],
@@ -177,7 +196,7 @@ def build_sdk_tools(tools: AgentTools, gate: Gate | None = None) -> list[SdkMcpT
     )
     async def request_action(args: dict[str, Any]) -> ToolResult:
         return (
-            _CLOSED
+            _closed_result()
             if closed()
             else await tools.request_action(typ=args["typ"], uzasadnienie=args["uzasadnienie"])
         )
@@ -190,11 +209,12 @@ def build_mcp_server(tools: AgentTools, gate: Gate | None = None) -> McpSdkServe
 
 
 def agent_env(api_key: str) -> dict[str, str]:
-    blanked = {k: "" for k in os.environ if _INHERITED_SECRET.search(k)}
+    blanked = {k: "" for k in os.environ if k not in ENV_ALLOWLIST}
     return {**blanked, "ANTHROPIC_API_KEY": api_key}
 
 
 def build_options(settings: Settings, server: McpSdkServerConfig) -> ClaudeAgentOptions:
+    """Opcje przebiegu. Tworzy katalog roboczy (cwd); usuwa go `SdkAgentRunner.run`."""
     if settings.anthropic_api_key is None:
         raise ValueError("Brak ANTHROPIC_API_KEY")
     return ClaudeAgentOptions(
@@ -244,6 +264,7 @@ class SdkAgentRunner:
         self._query = query_fn
         self._timeout_s = settings.agent_timeout_s if timeout_s is None else timeout_s
         self.init_tools: list[str] | None = None
+        self._turns = 0
 
     async def _consume(
         self, ctx: AnalysisContext, options: ClaudeAgentOptions, opened: list[bool]
@@ -255,24 +276,37 @@ class SdkAgentRunner:
                     if not (isinstance(msg, SystemMessage) and msg.subtype == "init"):
                         if isinstance(msg, SystemMessage):
                             continue
-                        raise UnexpectedToolset(extra=[], missing=list(ALLOWED_TOOLS))
+                        raise _NoInit
                     raw = msg.data.get("tools")
                     tools = [t for t in raw if isinstance(t, str)] if isinstance(raw, list) else []
                     self.init_tools = tools
                     check_init_tools(tools)
                     opened[0] = True
+                elif isinstance(msg, AssistantMessage):
+                    self._turns += 1
                 elif isinstance(msg, ResultMessage):
                     return outcome_from_result(msg)
-        return RunOutcome("failed", 0, 0.0, "brak_wyniku")
+        return RunOutcome("failed", self._turns, 0.0, "brak_wyniku")
 
     async def run(self, ctx: AnalysisContext, tools: AgentTools) -> RunOutcome:
+        if self._settings.anthropic_api_key is None:
+            out = RunOutcome("failed", 0, 0.0, NO_API_KEY)
+            log.error(
+                "agent_run", analysis_id=ctx.analysis_id, status=out.status, reason=out.reason
+            )
+            return out
         opened = [False]
+        self._turns = 0
         server = build_mcp_server(tools, gate=lambda: opened[0])
         options = build_options(self._settings, server)
+        # Koszt podaje tylko ResultMessage; przy przerwaniu znamy wyłącznie liczbę tur.
         try:
             out = await asyncio.wait_for(self._consume(ctx, options, opened), self._timeout_s)
         except TimeoutError:
-            out = RunOutcome("budget_exceeded", 0, 0.0, "timeout")
+            out = RunOutcome("budget_exceeded", self._turns, 0.0, "timeout")
+        except _NoInit:
+            log.error("agent_no_init", analysis_id=ctx.analysis_id)
+            out = RunOutcome("failed", 0, 0.0, NO_INIT)
         except UnexpectedToolset as e:
             log.error(
                 "agent_toolset_mismatch",
@@ -282,7 +316,7 @@ class SdkAgentRunner:
             )
             out = RunOutcome("failed", 0, 0.0, TOOLSET_MISMATCH)
         except ClaudeSDKError as e:
-            out = RunOutcome("failed", 0, 0.0, type(e).__name__)
+            out = RunOutcome("failed", self._turns, 0.0, type(e).__name__)
         finally:
             if options.cwd is not None:
                 shutil.rmtree(options.cwd, ignore_errors=True)

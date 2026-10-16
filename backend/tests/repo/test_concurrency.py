@@ -4,6 +4,7 @@ Dane są zatwierdzane (inne połączenie musi je widzieć) i usuwane po teście.
 """
 
 # ruff: noqa: S106
+import asyncio
 import threading
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -11,13 +12,15 @@ from typing import Any
 
 import pytest
 from sqlalchemy import Engine, delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.agent.context import AnalysisContext
+from app.agent.tools import AgentTools
 from app.config import Settings
 from app.repo import actions, analyses, models
 from app.repo.actions import ActionAlreadyDecided
 from app.repo.analyses import AnalysisAlreadyActive
-from app.repo.contracts import add_contract, add_version
+from app.repo.contracts import add_contract, add_version, list_fragments
 from app.repo.templates import add_template_version
 from app.services import actions as actions_service
 
@@ -196,3 +199,32 @@ def test_add_template_version_concurrent(db_engine: Engine) -> None:
         with Session(db_engine) as s:
             s.execute(delete(models.Template).where(models.Template.nazwa_klauzuli == name))
             s.commit()
+
+
+def test_submit_finding_waits_for_analysis_row_lock(db_engine: Engine, data: Data) -> None:
+    """Liczenie tez i zapis są pod blokadą wiersza analizy (limit nie do obejścia wyścigiem)."""
+    with Session(db_engine) as s:
+        frag = list_fragments(s, data.version_id)[-1]  # § 1 z cytowanym zdaniem
+    ctx = AnalysisContext(data.analysis_id, data.version_id, "najem", max_findings=60)
+    tools = AgentTools(ctx, sessionmaker(db_engine))
+
+    def lock(s: Session) -> None:
+        s.execute(
+            select(models.Analysis.id)
+            .where(models.Analysis.id == data.analysis_id)
+            .with_for_update(key_share=True)  # FOR NO KEY UPDATE: nie koliduje z KEY SHARE z FK
+        ).one()
+
+    def submit(_: Session) -> Any:
+        return asyncio.run(
+            tools.submit_finding(
+                "termin",
+                "Czas nieoznaczony",
+                "lokal do używania na czas nieoznaczony",
+                frag.id,
+                "Uzasadnienie.",
+            )
+        )
+
+    result = race(db_engine, lock, submit)
+    assert result["value"]["is_error"] is False
