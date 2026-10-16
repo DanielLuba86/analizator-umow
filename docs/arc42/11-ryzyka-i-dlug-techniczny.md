@@ -17,4 +17,3 @@
 | Brak limitu analiz na użytkownika | Jeden użytkownik może zająć cały limit globalny | Licznik aktywnych analiz per `started_by` |
 | Analizy w `BackgroundTasks` jednego procesu | Brak skalowania poziomego; restart przerywa analizy | Kolejka zadań (np. arq, Celery), gdy wzrośnie ruch |
 | Ponowienia wywołań Claude API tylko w domyślnej polityce SDK | Przejściowy błąd kończy analizę statusem `failed` | Własna polityka ponowień z backoffem dla błędów 429/5xx |
-| Limit prób logowania tylko w nginx, bez testu automatycznego | Zmiana konfiguracji nginx mogłaby go po cichu wyłączyć | Test E2E na stosie compose w CI |
