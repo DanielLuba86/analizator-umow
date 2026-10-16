@@ -45,7 +45,7 @@ Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](..
 - połączenie z bazą;
 - dostawca modelu (`LLM_PROVIDER`: Claude API albo Microsoft Foundry) i jego dane logowania;
 - modele;
-- limity agenta;
+- limity agenta i liczba ponowień wywołań API (`CLASSIFIER_MAX_RETRIES`, `AGENT_MAX_RETRIES`);
 - maksymalna długość umowy i rozmiar ciała żądania;
 - limit analiz trwających jednocześnie (`MAX_ACTIVE_ANALYSES`);
 - czas życia sesji;

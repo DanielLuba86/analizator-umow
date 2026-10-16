@@ -146,7 +146,14 @@ def test_agent_env_blanks_everything_but_allowlist(monkeypatch: pytest.MonkeyPat
         "SEED_LAWYER_PASSWORD": "",
         "PGPASS": "",
         "AWS_ACCESS_KEY_ID": "",
+        "CLAUDE_CODE_MAX_RETRIES": "10",
     }
+
+
+def test_agent_env_sets_max_retries_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Liczba ponowień CLI pochodzi z ustawień, nie z otoczenia procesu (ADR 0009)."""
+    monkeypatch.setenv("CLAUDE_CODE_MAX_RETRIES", "99")
+    assert _options(_settings(agent_max_retries=3)).env["CLAUDE_CODE_MAX_RETRIES"] == "3"
 
 
 def test_build_options_requires_api_key() -> None:
@@ -364,6 +371,7 @@ def test_agent_env_foundry_blanks_inherited_anthropic_key(
         "CLAUDE_CODE_USE_FOUNDRY": "1",
         "ANTHROPIC_FOUNDRY_RESOURCE": "moj-zasob",
         "ANTHROPIC_FOUNDRY_API_KEY": "k-f",
+        "CLAUDE_CODE_MAX_RETRIES": "10",
     }
 
 

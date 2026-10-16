@@ -213,9 +213,10 @@ def build_mcp_server(tools: AgentTools, gate: Gate | None = None) -> McpSdkServe
 
 
 def agent_env(settings: Settings) -> dict[str, str]:
-    """Wyczyszczone dziedziczone zmienne plus dane logowania wybranego dostawcy (ADR 0009)."""
+    """Wyczyszczone dziedziczone zmienne, dane logowania dostawcy (ADR 0009) i ponowienia CLI."""
     blanked = {k: "" for k in os.environ if k not in ENV_ALLOWLIST}
-    return {**blanked, **agent_credentials_env(settings)}
+    retries = {"CLAUDE_CODE_MAX_RETRIES": str(settings.agent_max_retries)}
+    return {**blanked, **agent_credentials_env(settings), **retries}
 
 
 def build_options(settings: Settings, server: McpSdkServerConfig) -> ClaudeAgentOptions:

@@ -45,6 +45,10 @@ def classifier_client(
         return anthropic.AsyncAnthropicFoundry(
             api_key=settings.anthropic_foundry_api_key.get_secret_value(),
             resource=settings.anthropic_foundry_resource,
+            max_retries=settings.classifier_max_retries,
         )
     assert settings.anthropic_api_key is not None  # noqa: S101
-    return anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value())
+    return anthropic.AsyncAnthropic(
+        api_key=settings.anthropic_api_key.get_secret_value(),
+        max_retries=settings.classifier_max_retries,
+    )
