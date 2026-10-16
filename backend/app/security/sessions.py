@@ -2,6 +2,7 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.repo.models import Session as SessionRow
@@ -43,3 +44,9 @@ def delete_session(s: Session, token: str) -> None:
     if row is not None:
         s.delete(row)
         s.flush()
+
+
+def delete_expired_sessions(s: Session, now: datetime) -> int:
+    """Usuwa sesje, które wygasły, a nikt ich już nie użyje (inaczej leżałyby wiecznie)."""
+    result = s.execute(delete(SessionRow).where(SessionRow.expires_at <= now))
+    return result.rowcount  # type: ignore[attr-defined,no-any-return]

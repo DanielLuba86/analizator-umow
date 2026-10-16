@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.domain.model import AnalysisStatus, Claim
@@ -13,8 +13,24 @@ ACTIVE_STATUSES = ("queued", "running")
 TERMINAL_STATUSES = ("done", "failed", "quarantined", "budget_exceeded")
 
 
+# Dozwolone przejścia statusu. quarantined → done to zatwierdzenie kwarantanny przez prawnika;
+# odrzucenie zostawia analizę w kwarantannie. queued → failed: błąd przed startem agenta
+# albo restart procesu (fail_interrupted).
+TRANSITIONS: dict[str, frozenset[str]] = {
+    "queued": frozenset({"running", "failed"}),
+    "running": frozenset({"done", "failed", "quarantined", "budget_exceeded"}),
+    "quarantined": frozenset({"done"}),
+}
+
+
 class AnalysisAlreadyActive(Exception):
     """Dla wersji trwa już analiza (queued/running)."""
+
+
+class InvalidTransition(Exception):
+    def __init__(self, old: str, new: str) -> None:
+        super().__init__(f"{old} → {new}")
+        self.old, self.new = old, new
 
 
 def active_analysis(s: Session, version_id: int) -> int | None:
@@ -48,6 +64,8 @@ def set_status(
     reason: str | None = None,
 ) -> None:
     a = s.execute(select(Analysis).where(Analysis.id == analysis_id)).scalar_one()
+    if status != a.status and status not in TRANSITIONS.get(a.status, frozenset()):
+        raise InvalidTransition(a.status, status)
     a.status = status
     if turns is not None:
         a.turns = turns
@@ -58,6 +76,17 @@ def set_status(
     if status in TERMINAL_STATUSES:
         a.finished_at = datetime.now(UTC)
     s.flush()
+
+
+def claim_analysis(s: Session, analysis_id: int) -> bool:
+    """queued → running atomowo; False, gdy analizę już ktoś uruchomił (lub zakończył)."""
+    result = s.execute(
+        update(Analysis)
+        .where(Analysis.id == analysis_id, Analysis.status == "queued")
+        .values(status="running")
+        .execution_options(synchronize_session="fetch")
+    )
+    return bool(result.rowcount == 1)  # type: ignore[attr-defined]
 
 
 def add_finding(s: Session, analysis_id: int, claim: Claim, match: QuoteMatch) -> int:

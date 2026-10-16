@@ -149,6 +149,36 @@ def test_deleting_contract_cascades(db_session: Session) -> None:
     db_session.add(Fragment(version_id=v.id, frag_id="f001", label="§ 1", start=0, end=3))
     db_session.add(_finding(a.id))
     db_session.flush()
+    other = Contract(title="Inna", kind="najem", source="kontrahent", created_by=a.started_by)
+    db_session.add(other)
+    db_session.flush()
+    other_version = ContractVersion(contract_id=other.id, nr=1, text="xyz", sha256="1" * 64)
+    db_session.add(other_version)
+    db_session.flush()
+    vid, aid, other_vid = v.id, a.id, other_version.id
     db_session.execute(delete(Contract).where(Contract.id == v.contract_id))
-    for model in (ContractVersion, Fragment, Analysis, Finding):
-        assert db_session.scalars(select(model)).first() is None, model.__name__
+    db_session.expire_all()
+    assert db_session.get(ContractVersion, vid) is None
+    assert db_session.get(Analysis, aid) is None
+    gone = (
+        (Fragment, Fragment.version_id == vid),
+        (Finding, Finding.analysis_id == aid),
+    )
+    for model, cond in gone:
+        assert db_session.scalars(select(model).where(cond)).first() is None, model.__name__
+    assert db_session.get(ContractVersion, other_vid) is not None
+
+
+def test_child_fk_columns_indexed(db_engine: Engine) -> None:
+    """Każda kolumna klucza obcego jest pierwszą kolumną jakiegoś indeksu (kaskady, złączenia)."""
+    insp = inspect(db_engine)
+    missing = []
+    for table in insp.get_table_names():
+        leading = {ix["column_names"][0] for ix in insp.get_indexes(table)}
+        leading |= {uq["column_names"][0] for uq in insp.get_unique_constraints(table)}
+        leading |= set(insp.get_pk_constraint(table)["constrained_columns"][:1])
+        for fk in insp.get_foreign_keys(table):
+            column = fk["constrained_columns"][0]
+            if column not in leading:
+                missing.append(f"{table}.{column}")
+    assert missing == []

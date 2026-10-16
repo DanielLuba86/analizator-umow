@@ -64,10 +64,22 @@ def _created() -> Mapped[datetime]:
     return mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-def _fk(target: str, *, nullable: bool = False, cascade: bool = True) -> Mapped[Any]:
+def _fk(
+    target: str, *, nullable: bool = False, cascade: bool = True, index: bool = True
+) -> Mapped[Any]:
+    """Klucz obcy z indeksem: kaskadowe usuwanie i złączenia nie skanują całej tabeli.
+
+    `index=False` tylko gdy kolumna już prowadzi unikat (indeks byłby zdublowany).
+    """
     return mapped_column(
-        ForeignKey(target, ondelete="CASCADE" if cascade else None), nullable=nullable
+        ForeignKey(target, ondelete="CASCADE" if cascade else None),
+        nullable=nullable,
+        index=index,
     )
+
+
+def _fk_set_null(target: str) -> Mapped[Any]:
+    return mapped_column(ForeignKey(target, ondelete="SET NULL"), nullable=True, index=True)
 
 
 class User(Base):
@@ -101,7 +113,7 @@ class ContractVersion(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    contract_id: Mapped[int] = _fk("contracts.id")
+    contract_id: Mapped[int] = _fk("contracts.id", index=False)  # uq (contract_id, nr)
     nr: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
     sha256: Mapped[str] = mapped_column(String(64))
@@ -115,7 +127,7 @@ class Fragment(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    version_id: Mapped[int] = _fk("contract_versions.id")
+    version_id: Mapped[int] = _fk("contract_versions.id", index=False)  # uq (version_id, frag_id)
     frag_id: Mapped[str] = mapped_column(String(MAX_FRAGMENT_ID_LEN))
     label: Mapped[str] = mapped_column(String(200))
     start: Mapped[int] = mapped_column(Integer)
@@ -137,6 +149,8 @@ class Analysis(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     official: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Wynik agenta (np. budżet, błąd SDK) — `reason` przy kwarantannie podaje jej powód.
+    agent_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Template(Base):
@@ -172,9 +186,7 @@ class Finding(Base):
     end: Mapped[int] = mapped_column(Integer)
     poziom_ryzyka: Mapped[str | None] = mapped_column(String(20), nullable=True)
     uzasadnienie: Mapped[str] = mapped_column(Text)
-    template_id: Mapped[int | None] = mapped_column(
-        ForeignKey("templates.id", ondelete="SET NULL"), nullable=True
-    )
+    template_id: Mapped[int | None] = _fk_set_null("templates.id")
 
 
 class RejectedClaim(Base):
@@ -193,9 +205,7 @@ class RejectedClaim(Base):
     fragment_id: Mapped[str] = mapped_column(String(MAX_FRAGMENT_ID_LEN))
     poziom_ryzyka: Mapped[str | None] = mapped_column(String(20), nullable=True)
     uzasadnienie: Mapped[str] = mapped_column(Text)
-    template_id: Mapped[int | None] = mapped_column(
-        ForeignKey("templates.id", ondelete="SET NULL"), nullable=True
-    )
+    template_id: Mapped[int | None] = _fk_set_null("templates.id")
     powod: Mapped[str] = mapped_column(String(40))
 
 
@@ -229,9 +239,7 @@ class PendingAction(Base):
     analysis_id: Mapped[int] = _fk("analyses.id")
     payload: Mapped[Any] = mapped_column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
     status: Mapped[str] = mapped_column(String(20), default="oczekuje", server_default="oczekuje")
-    decided_by: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    decided_by: Mapped[int | None] = _fk_set_null("users.id")
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _created()
 
@@ -240,9 +248,7 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    user_id: Mapped[int | None] = _fk_set_null("users.id")
     akcja: Mapped[str] = mapped_column(String(100))
     obiekt: Mapped[str] = mapped_column(String(200))
     kiedy: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, pool
 
 from alembic import context
 from app.config import get_settings
@@ -16,7 +16,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(get_settings().database_url)
+    # NullPool: migracja to jednorazowe połączenie, pula tylko trzymałaby je otwarte.
+    engine = create_engine(get_settings().database_url, poolclass=pool.NullPool)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

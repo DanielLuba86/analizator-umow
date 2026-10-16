@@ -18,6 +18,7 @@ from app.repo import actions, analyses, models
 from app.repo.actions import ActionAlreadyDecided
 from app.repo.analyses import AnalysisAlreadyActive
 from app.repo.contracts import add_contract, add_version
+from app.repo.templates import add_template_version
 from app.services import actions as actions_service
 
 SETTINGS = Settings(database_url="postgresql+psycopg://u:p@localhost/db")
@@ -44,6 +45,7 @@ def data(db_engine: Engine) -> Iterator[Data]:
         cid = add_contract(s, title="Wyścig", kind="najem", source="kontrahent", created_by=u.id)
         vid = add_version(s, cid, TEXT)
         aid = analyses.create_analysis(s, vid, u.id, "fake")
+        analyses.set_status(s, aid, "running")
         analyses.set_status(s, aid, "done")
         s.commit()
         d = Data(u.id, cid, vid, aid)
@@ -171,3 +173,26 @@ def test_concurrent_identical_requests_return_one_pending_action(
             .where(models.PendingAction.analysis_id == data.analysis_id)
         )
     assert n == 1
+
+
+def test_add_template_version_concurrent(db_engine: Engine) -> None:
+    name = "Wyścig wersji wzorca"
+    try:
+        result = race(
+            db_engine,
+            lambda s: add_template_version(s, "najem", name, "pierwsza"),
+            lambda s: add_template_version(s, "najem", name, "druga"),
+        )
+        assert "error" not in result, result.get("error")
+        assert result["value"] == 2
+        with Session(db_engine) as s:
+            versions = sorted(
+                s.scalars(
+                    select(models.Template.wersja).where(models.Template.nazwa_klauzuli == name)
+                )
+            )
+        assert versions == [1, 2]
+    finally:
+        with Session(db_engine) as s:
+            s.execute(delete(models.Template).where(models.Template.nazwa_klauzuli == name))
+            s.commit()
