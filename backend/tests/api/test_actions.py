@@ -352,3 +352,25 @@ def test_list_actions_filter_by_analysis(assistant: TestClient) -> None:
     both = assistant.get("/api/actions").json()
     assert {id1, id2} <= {a["id"] for a in both}
     assert assistant.get("/api/actions?analysis_id=abc").status_code == 422
+
+
+def test_approved_quarantine_of_interrupted_agent_stays_incomplete(
+    app: FastAPI, assistant: TestClient, lawyer: TestClient
+) -> None:
+    """Kwarantanna przykrywa wynik agenta; po zatwierdzeniu raport nadal jest niepełny."""
+    app.dependency_overrides[get_runner] = lambda: FakeAgentRunner(
+        [ToolCall("list_fragments")] * 5, max_turns=1, max_budget_usd=0.5, timeout_s=5.0
+    )
+    aid = analysis(assistant, INJECTED)
+    rep = assistant.get(f"/api/analyses/{aid}").json()
+    assert (rep["status"], rep["agent_reason"]) == ("quarantined", "turns")
+    assert decide(lawyer, rep["quarantine"]["action_id"], True).status_code == 200
+    rep = assistant.get(f"/api/analyses/{aid}").json()
+    assert (rep["status"], rep["incomplete"], rep["agent_reason"]) == ("done", True, "turns")
+    export_id = decide(lawyer, request(assistant, aid, "eksport"), True).json()["export_id"]
+    assert assistant.get(f"/api/exports/{export_id}").json()["incomplete"] is True
+
+
+def test_finished_agent_report_is_complete(assistant: TestClient) -> None:
+    rep = assistant.get(f"/api/analyses/{analysis(assistant)}").json()
+    assert (rep["status"], rep["incomplete"], rep["agent_reason"]) == ("done", False, None)

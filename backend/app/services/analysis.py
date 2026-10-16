@@ -158,9 +158,13 @@ async def _run_analysis(
     classifier: InjectionClassifier,
     settings: Settings,
 ) -> None:
-    with session_factory() as s:
-        claimed = analyses.claim_analysis(s, analysis_id)
-        s.commit()
+    try:
+        with session_factory() as s:
+            claimed = analyses.claim_analysis(s, analysis_id)
+            s.commit()
+    except Exception as e:  # noqa: BLE001 - analiza zostaje queued; sprząta ją restart
+        log.error("analysis_claim_failed", analysis_id=analysis_id, error=type(e).__name__)
+        return
     if not claimed:  # ponowne wywołanie: analizę już uruchomiono, nie powielamy tez
         log.warning("analysis_already_started", analysis_id=analysis_id)
         return
