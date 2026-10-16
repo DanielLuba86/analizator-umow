@@ -23,9 +23,9 @@ flowchart LR
 
 | Element | Obraz / konfiguracja | Uwagi |
 |---|---|---|
-| `db` | `postgres:16`, wolumen `pgdata`, healthcheck `pg_isready` | backend startuje po `service_healthy` |
-| `backend` | `backend/Dockerfile`: Python 3.14, `uv sync --frozen --no-dev`, użytkownik bez uprawnień `appuser`; zawiera `alembic.ini` i migracje; przy starcie `alembic upgrade head`, potem uvicorn | konfiguracja z `.env`; wzorce klauzul z `data/wzorce` montowanych tylko do odczytu; `restart: unless-stopped` |
-| `frontend` | `frontend/Dockerfile`: build Vite, serwowany przez `nginx-unprivileged` (bez roota, port 8080) | CSP, proxy `/api/` do `backend:8000` z nagłówkiem `Host` zawierającym port, limit ciała 1 MB, limit logowania 10/min na IP |
+| `db` | `postgres:16`, wolumen `pgdata`, healthcheck `pg_isready` | backend startuje po `service_healthy`; `restart: unless-stopped` |
+| `backend` | `backend/Dockerfile`: Python 3.14, `uv sync --frozen --no-dev`, użytkownik bez uprawnień `appuser`; zawiera `alembic.ini` i migracje; przy starcie `alembic upgrade head`, potem uvicorn | konfiguracja z `.env`; wzorce klauzul z `data/wzorce` montowanych tylko do odczytu; healthcheck `/api/health` (po migracjach), frontend startuje po `service_healthy`; `restart: unless-stopped` |
+| `frontend` | `frontend/Dockerfile`: build Vite, serwowany przez `nginx-unprivileged` (bez roota, port 8080) | CSP, proxy `/api/` do `backend:8000` z nagłówkiem `Host` zawierającym port, limit ciała 1 MB, limit logowania 10/min na IP; adres backendu rozwiązywany przy każdym żądaniu (`resolver 127.0.0.11`), więc nowy kontener backendu nie wymaga restartu nginx; `restart: unless-stopped` |
 
 ## Uruchomienie
 
