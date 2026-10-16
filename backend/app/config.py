@@ -5,7 +5,8 @@ from typing import Literal
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_FOUNDRY_RESOURCE = re.compile(r"[a-z0-9][a-z0-9-]{1,62}")
+# Reguła CLI Claude Code: 2–64 znaki, litery, cyfry i myślniki, bez myślnika na brzegach.
+_FOUNDRY_RESOURCE = re.compile(r"[a-z0-9][a-z0-9-]{0,62}[a-z0-9]")
 
 
 class Settings(BaseSettings):
@@ -21,6 +22,9 @@ class Settings(BaseSettings):
     llm_provider: Literal["anthropic", "foundry"] = "anthropic"
     anthropic_foundry_api_key: SecretStr | None = None
     anthropic_foundry_resource: str | None = None  # sama nazwa zasobu Foundry, nie URL
+    # Nieobsługiwane: SDK `anthropic` czyta tę zmienną ze środowiska nawet przy `resource=`
+    # i wtedy odmawia utworzenia klienta. Pole istnieje tylko po to, by odrzucić ją przy starcie.
+    anthropic_foundry_base_url: str | None = None
     agent_model: str = "claude-opus-5-5"
     classifier_model: str = "claude-haiku-5-5"
     agent_max_turns: int = 30
@@ -35,6 +39,15 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     seed_assistant_password: SecretStr | None = None
     seed_lawyer_password: SecretStr | None = None
+
+    @field_validator("anthropic_foundry_base_url")
+    @classmethod
+    def _foundry_base_url_unsupported(cls, value: str | None) -> str | None:
+        if value is not None:
+            raise ValueError(
+                "ANTHROPIC_FOUNDRY_BASE_URL nie jest obsługiwane; podaj ANTHROPIC_FOUNDRY_RESOURCE"
+            )
+        return value
 
     @field_validator("anthropic_foundry_resource")
     @classmethod

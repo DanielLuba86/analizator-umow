@@ -31,7 +31,7 @@ flowchart LR
 
 Pełna instrukcja jest w [README](../../README.md). W skrócie:
 
-1. `cp .env.example .env` i uzupełnienie `ANTHROPIC_API_KEY` oraz haseł.
+1. `cp .env.example .env` i uzupełnienie danych logowania dostawcy modelu (`ANTHROPIC_API_KEY` albo ustawień Foundry) oraz haseł.
 2. `docker compose up -d --build` — backend przy starcie wykonuje migracje.
 3. `docker compose exec backend python -m app.repo.seed` — wzorce klauzul i konta demo.
 

@@ -30,7 +30,7 @@ C4Context
 | Przeglądarka ↔ frontend (nginx) | HTTP(S), statyczne pliki SPA | nagłówek CSP bez `unsafe-inline` |
 | Frontend ↔ API | REST/JSON pod `/api`, błędy `problem+json` | sesja w ciasteczku `HttpOnly`, `SameSite=Strict` |
 | Backend ↔ PostgreSQL | psycopg 3 | jedyny dostęp do bazy przez moduł `repo/` |
-| Backend ↔ Claude API | Claude Agent SDK (proces CLI z własnymi narzędziami MCP in-process), Anthropic SDK dla klasyfikatora | klucz tylko w zmiennej `ANTHROPIC_API_KEY` |
+| Backend ↔ Claude API albo Microsoft Foundry | Claude Agent SDK (proces CLI z własnymi narzędziami MCP in-process), Anthropic SDK dla klasyfikatora; dostawcę wybiera `LLM_PROVIDER` ([ADR 0009](../adr/0009-dostawca-modelu-jako-ustawienie.md)) | klucz tylko w zmiennej środowiskowej: `ANTHROPIC_API_KEY` albo `ANTHROPIC_FOUNDRY_API_KEY` |
 
 ## Zakres
 

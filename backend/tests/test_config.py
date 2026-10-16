@@ -69,13 +69,18 @@ def test_foundry_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "moj-zasob.services.ai.azure.com",
         "Moj-Zasob",
         "moj-zasob ",
+        "moj-zasob-",
+        "-moj-zasob",
+        "a",
+        "a" * 65,
     ],
 )
 def test_foundry_resource_rejects_url_host_uppercase_and_trailing_space(resource: str) -> None:
     with pytest.raises(ValidationError) as exc:
         Settings(database_url=URL, anthropic_foundry_resource=resource)
     assert "samą nazwę zasobu" in str(exc.value)
-    assert resource.strip() not in str(exc.value)
+    if len(resource) > 3:  # krótka wartość mogłaby wystąpić w treści komunikatu przypadkiem
+        assert resource.strip() not in str(exc.value)
 
 
 def test_empty_foundry_resource_is_unset(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,3 +95,22 @@ def test_unknown_or_capitalized_provider_rejected(
     monkeypatch.setenv("LLM_PROVIDER", provider)
     with pytest.raises(ValidationError):
         Settings(database_url=URL)
+
+
+def test_foundry_resource_accepts_cli_valid_names() -> None:
+    for name in ("ab", "moj-zasob", "a" * 64, "zasob-01"):
+        assert (
+            Settings(database_url=URL, anthropic_foundry_resource=name).anthropic_foundry_resource
+            == name
+        )
+
+
+def test_foundry_base_url_rejected_with_clear_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SDK `anthropic` czyta ANTHROPIC_FOUNDRY_BASE_URL ze środowiska nawet przy `resource=`."""
+    monkeypatch.setenv(
+        "ANTHROPIC_FOUNDRY_BASE_URL", "https://moj-zasob.services.ai.azure.com/anthropic"
+    )
+    with pytest.raises(ValidationError) as exc:
+        Settings(database_url=URL)
+    assert "ANTHROPIC_FOUNDRY_RESOURCE" in str(exc.value)
+    assert "services.ai.azure.com" not in str(exc.value)

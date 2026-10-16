@@ -77,6 +77,8 @@ Koszt rozlicza Microsoft, według stawek Claude API.
    ```
 
    `ANTHROPIC_API_KEY` może zostać pusty. Przy `foundry` agent go i tak nie dostaje.
+   Nie ustawiaj `ANTHROPIC_FOUNDRY_BASE_URL` (znanego z dokumentacji Claude Code): aplikacja
+   przyjmuje tylko nazwę zasobu i z tą zmienną nie wystartuje.
 
 Błędna nazwa zasobu nie zatrzymuje startu, jeśli ma poprawny format, ale analiza czeka wtedy na
 odpowiedź aż do `AGENT_TIMEOUT_S` i kończy się statusem „przekroczony budżet” (`timeout`), a
