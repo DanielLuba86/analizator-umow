@@ -1,5 +1,5 @@
 # ruff: noqa: S106
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +16,7 @@ from app.agent.context import AnalysisContext
 from app.agent.fake_runner import FakeAgentRunner, ToolCall
 from app.agent.runner import RunOutcome
 from app.agent.tools import AgentTools
-from app.api.analyses import get_classifier, get_runner
+from app.api.analyses import analyses_word, get_classifier, get_runner
 from app.api.deps import get_app_settings
 from app.config import Settings
 from app.repo import models
@@ -295,20 +295,57 @@ def test_failed_analysis_with_injection_finding_stays_hidden(
 
 
 def test_global_active_analyses_cap_429(
-    client: TestClient, agent: Agent, app: FastAPI, sf: sessionmaker[Session]
+    client: TestClient,
+    agent: Agent,
+    app: FastAPI,
+    sf: sessionmaker[Session],
+    make_user: Callable[[str, str], int],
 ) -> None:
     app.dependency_overrides[get_app_settings] = lambda: make_settings(
-        max_contract_chars=200_000, max_active_analyses=1
+        max_contract_chars=200_000, max_active_analyses=1, max_active_analyses_per_user=1
     )
     busy, other = new_version(client), new_version(client)
-    with sf() as s:
-        uid = s.scalar(select(models.User.id).where(models.User.login.like("asystent-%")))
-        assert uid is not None
-        create_analysis(s, busy, uid, "fake")  # status queued — zajmuje jedyne miejsce
+    with sf() as s:  # jedyne miejsce zajmuje analiza innego użytkownika
+        create_analysis(s, busy, make_user("inny-prawnik", "prawnik"), "fake")
         s.commit()
     r = client.post(f"/api/versions/{other}/analyses")
     assert r.status_code == 429
     assert r.json()["type"] == "/problems/za_duzo_analiz"
+
+
+def test_per_user_active_analyses_cap_429(
+    client: TestClient, agent: Agent, app: FastAPI, sf: sessionmaker[Session]
+) -> None:
+    """Gdy przekroczone są oba limity, komunikat wskazuje limit użytkownika."""
+    app.dependency_overrides[get_app_settings] = lambda: make_settings(
+        max_contract_chars=200_000, max_active_analyses=2, max_active_analyses_per_user=2
+    )
+    v1, v2, v3 = new_version(client), new_version(client), new_version(client)
+    with sf() as s:
+        uid = s.scalar(select(models.User.id).where(models.User.login.like("asystent-%")))
+        assert uid is not None
+        create_analysis(s, v1, uid, "fake")  # status queued — dwie trwające analizy tej osoby
+        create_analysis(s, v2, uid, "fake")
+        s.commit()
+    r = client.post(f"/api/versions/{v3}/analyses")
+    assert r.status_code == 429
+    assert r.json()["type"] == "/problems/za_duzo_analiz_uzytkownika"
+    assert "Masz już 2 trwające analizy" in r.json()["title"]
+
+
+@pytest.mark.parametrize(
+    ("n", "word"),
+    [
+        (1, "trwającą analizę"),
+        (2, "trwające analizy"),
+        (4, "trwające analizy"),
+        (5, "trwających analiz"),
+        (12, "trwających analiz"),
+        (22, "trwające analizy"),
+    ],
+)
+def test_analyses_word_polish_plural(n: int, word: str) -> None:
+    assert analyses_word(n) == word
 
 
 def test_background_analysis_logs_request_id(client: TestClient, app: FastAPI) -> None:

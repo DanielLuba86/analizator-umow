@@ -19,7 +19,7 @@ from app.agent.tools import AgentTools
 from app.config import Settings
 from app.repo import actions, analyses, models
 from app.repo.actions import ActionAlreadyDecided
-from app.repo.analyses import AnalysisAlreadyActive
+from app.repo.analyses import AnalysisAlreadyActive, TooManyUserAnalyses
 from app.repo.contracts import add_contract, add_version, list_fragments
 from app.repo.templates import add_template_version
 from app.services import actions as actions_service
@@ -109,6 +109,31 @@ def test_double_start_same_version_second_gets_already_active(
             .select_from(models.Analysis)
             .where(
                 models.Analysis.version_id == data.version_id, models.Analysis.status == "queued"
+            )
+        )
+    assert n == 1
+
+
+def test_parallel_starts_same_user_respect_per_user_limit(db_engine: Engine, data: Data) -> None:
+    """Dwa szybkie starty tej samej osoby na różnych wersjach: przy limicie 1 przechodzi jeden."""
+    with Session(db_engine) as s:
+        other_vid = add_version(s, data.contract_id, TEXT.replace("lokal", "garaż"))
+        s.commit()
+
+    def start(vid: int) -> Callable[[Session], int]:
+        return lambda s: analyses.create_analysis(
+            s, vid, data.user_id, "fake", max_active_per_user=1
+        )
+
+    result = race(db_engine, start(data.version_id), start(other_vid))
+    assert isinstance(result.get("error"), TooManyUserAnalyses)
+    with Session(db_engine) as s:
+        n = s.scalar(
+            select(func.count())
+            .select_from(models.Analysis)
+            .where(
+                models.Analysis.started_by == data.user_id,
+                models.Analysis.status.in_(analyses.ACTIVE_STATUSES),
             )
         )
     assert n == 1

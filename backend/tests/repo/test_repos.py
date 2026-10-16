@@ -15,6 +15,7 @@ from app.repo.actions import ActionAlreadyDecided, decide_action, list_pending, 
 from app.repo.analyses import (
     AnalysisAlreadyActive,
     InvalidTransition,
+    TooManyUserAnalyses,
     active_analysis,
     add_finding,
     add_rejected,
@@ -116,6 +117,31 @@ def test_create_analysis_raises_when_active(db_session: Session) -> None:
     create_analysis(db_session, vid, uid, "m")
     with pytest.raises(AnalysisAlreadyActive):
         create_analysis(db_session, vid, uid, "m")
+
+
+def _another_version(s: Session, uid: int) -> int:
+    cid = add_contract(s, title="T2", kind="najem", source="wewnętrzna", created_by=uid)
+    return add_version(s, cid, TEXT)
+
+
+def test_create_analysis_enforces_per_user_limit(db_session: Session) -> None:
+    uid, v1 = _version(db_session)
+    v2, v3 = _another_version(db_session, uid), _another_version(db_session, uid)
+    create_analysis(db_session, v1, uid, "m", max_active_per_user=2)
+    create_analysis(db_session, v2, uid, "m", max_active_per_user=2)
+    with pytest.raises(TooManyUserAnalyses):
+        create_analysis(db_session, v3, uid, "m", max_active_per_user=2)
+    other = _user(db_session, "u2")
+    create_analysis(db_session, v3, other, "m", max_active_per_user=2)  # inny użytkownik
+
+
+def test_per_user_limit_frees_slot_after_finish(db_session: Session) -> None:
+    uid, v1 = _version(db_session)
+    v2 = _another_version(db_session, uid)
+    aid = create_analysis(db_session, v1, uid, "m", max_active_per_user=1)
+    set_status(db_session, aid, "running")
+    set_status(db_session, aid, "done")
+    create_analysis(db_session, v2, uid, "m", max_active_per_user=1)
 
 
 def test_findings_and_rejected(db_session: Session) -> None:

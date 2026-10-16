@@ -2,7 +2,7 @@ import re
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Reguła CLI Claude Code: 2–64 znaki, litery, cyfry i myślniki, bez myślnika na brzegach.
@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     max_contract_chars: int = 200_000
     max_body_bytes: int = 1_048_576  # ciało żądania; nginx ma ten sam limit (client_max_body_size)
     max_active_analyses: int = 5  # analizy queued/running naraz w całej aplikacji (koszt API)
+    max_active_analyses_per_user: int = 2  # jedna osoba nie zajmie wszystkich miejsc
     session_ttl_hours: int = 12
     cookie_secure: bool = True
     log_level: str = "INFO"
@@ -60,6 +61,14 @@ class Settings(BaseSettings):
         if value is not None and not _FOUNDRY_RESOURCE.fullmatch(value):
             raise ValueError("ANTHROPIC_FOUNDRY_RESOURCE: podaj samą nazwę zasobu Foundry")
         return value
+
+    @model_validator(mode="after")
+    def _per_user_limit_fits_global(self) -> "Settings":
+        if not 1 <= self.max_active_analyses_per_user <= self.max_active_analyses:
+            raise ValueError(
+                "MAX_ACTIVE_ANALYSES_PER_USER: podaj liczbę od 1 do MAX_ACTIVE_ANALYSES"
+            )
+        return self
 
 
 @lru_cache

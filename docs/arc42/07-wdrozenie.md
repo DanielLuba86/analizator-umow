@@ -47,7 +47,7 @@ Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](..
 - modele;
 - limity agenta i liczba ponowień wywołań API (`CLASSIFIER_MAX_RETRIES`, `AGENT_MAX_RETRIES`);
 - maksymalna długość umowy i rozmiar ciała żądania;
-- limit analiz trwających jednocześnie (`MAX_ACTIVE_ANALYSES`);
+- limity analiz trwających jednocześnie: w całej aplikacji (`MAX_ACTIVE_ANALYSES`) i na użytkownika (`MAX_ACTIVE_ANALYSES_PER_USER`);
 - czas życia sesji;
 - `COOKIE_SECURE` (`true` za TLS);
 - poziom logów;
