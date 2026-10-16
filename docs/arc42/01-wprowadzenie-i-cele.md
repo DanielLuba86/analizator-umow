@@ -48,5 +48,4 @@ Główne funkcje:
 
 ---
 
-Szkic przygotowany z pomocą agenta (Claude Code); zweryfikowany w PR #8 przez: oczekuje na
-przegląd zespołu.
+Szkic przygotowany z pomocą agenta (Claude Code); zweryfikowany w PR #8 przez: Daniel Łuba.
