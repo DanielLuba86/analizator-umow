@@ -69,16 +69,23 @@ class DecisionOut(BaseModel):
     export_id: int | None
 
 
-ANALYSIS_NOT_FOUND = ApiError(404, "nie_znaleziono_analizy", "Nie znaleziono analizy.")
-ACTION_NOT_FOUND = ApiError(404, "nie_znaleziono_wniosku", "Nie znaleziono wniosku.")
-REPORT_NOT_AVAILABLE = ApiError(
-    409, "raport_niedostepny", "Raport tej analizy nie jest jeszcze dostępny."
-)
+def analysis_not_found() -> ApiError:
+    return ApiError(404, "nie_znaleziono_analizy", "Nie znaleziono analizy.")
+
+
+def action_not_found() -> ApiError:
+    return ApiError(404, "nie_znaleziono_wniosku", "Nie znaleziono wniosku.")
+
+
+def report_not_available() -> ApiError:
+    return ApiError(409, "raport_niedostepny", "Raport tej analizy nie jest jeszcze dostępny.")
 
 
 @router.get("/actions")
-def list_actions(db: DbDep, status: ActionStatus | None = None) -> list[ActionOut]:
-    rows = actions.list_actions(db, status)
+def list_actions(
+    db: DbDep, status: ActionStatus | None = None, analysis_id: int | None = None
+) -> list[ActionOut]:
+    rows = actions.list_actions(db, status, analysis_id)
     export_ids = exports.export_ids_by_action(db, [a.id for a in rows])
     visible: dict[int, bool] = {}
     return [
@@ -98,16 +105,21 @@ def list_actions(db: DbDep, status: ActionStatus | None = None) -> list[ActionOu
 
 
 @router.post("/analyses/{analysis_id}/actions", status_code=201)
-def create_action(analysis_id: int, body: ActionIn, db: DbDep, user: UserDep) -> ActionCreated:
+def create_action(
+    analysis_id: int, body: ActionIn, db: DbDep, user: UserDep, response: Response
+) -> ActionCreated:
+    """201 — nowy wniosek; 200 — ten sam oczekujący wniosek już istnieje."""
     analysis = analyses.get_analysis(db, analysis_id)
     if analysis is None:
-        raise ANALYSIS_NOT_FOUND
+        raise analysis_not_found()
     try:
-        action_id = actions_service.request_user_action(db, analysis, body.typ, user.id)
+        requested = actions_service.request_user_action(db, analysis, body.typ, user.id)
     except ReportNotAvailable:
-        raise REPORT_NOT_AVAILABLE from None
+        raise report_not_available() from None
     db.commit()
-    return ActionCreated(action_id=action_id)
+    if not requested.created:
+        response.status_code = 200
+    return ActionCreated(action_id=requested.id)
 
 
 @router.post("/actions/{action_id}/decision")
@@ -116,7 +128,11 @@ def decide_action(
 ) -> DecisionOut:
     action = actions.get_action(db, action_id)
     if action is None:
-        raise ACTION_NOT_FOUND
+        raise action_not_found()
+    if body.template is not None and not (body.approve and action.typ == "wzorzec"):
+        raise ApiError(
+            422, "wzorzec_niedozwolony", "Treść wzorca podaje się tylko przy zatwierdzaniu wzorca."
+        )
     template = (
         None
         if body.template is None
@@ -143,7 +159,7 @@ def decide_action(
         ) from None
     except ReportNotAvailable:
         db.rollback()
-        raise REPORT_NOT_AVAILABLE from None
+        raise report_not_available() from None
     db.commit()
     return DecisionOut(id=action_id, status=result.status, export_id=result.export_id)
 
@@ -157,6 +173,8 @@ def get_export(export_id: int, db: DbDep) -> Response:
         content=json.dumps(e.content, ensure_ascii=False, indent=2),
         media_type="application/json",
         headers={
-            "Content-Disposition": f'attachment; filename="raport-analizy-{e.analysis_id}.json"'
+            "Content-Disposition": f'attachment; filename="raport-analizy-{e.analysis_id}.json"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
         },
     )

@@ -151,7 +151,7 @@ def test_concurrent_identical_requests_return_one_pending_action(
     def request(s: Session) -> int:
         analysis = analyses.get_analysis(s, data.analysis_id)
         assert analysis is not None
-        return actions_service.request_user_action(s, analysis, "eksport", data.user_id)
+        return actions_service.request_user_action(s, analysis, "eksport", data.user_id).id
 
     with Session(db_engine) as s1:
         first_id = request(s1)  # wiersz wstawiony, transakcja otwarta (unikat częściowy zajęty)

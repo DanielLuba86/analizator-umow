@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import structlog.contextvars
 from api_helpers import ApiClientFactory, make_settings
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -11,8 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agent.classifier import ClassifierHit, FakeClassifier
+from app.agent.context import AnalysisContext
 from app.agent.fake_runner import FakeAgentRunner, ToolCall
+from app.agent.runner import RunOutcome
+from app.agent.tools import AgentTools
 from app.api.analyses import get_classifier, get_runner
+from app.api.deps import get_app_settings
 from app.config import Settings
 from app.repo import models
 from app.repo.actions import decide_action
@@ -287,3 +292,36 @@ def test_failed_analysis_with_injection_finding_stays_hidden(
     rep = client.get(f"/api/analyses/{aid}").json()
     assert rep["status"] == "failed" and rep["findings"] == []
     assert client.post(f"/api/analyses/{aid}/actions", json={"typ": "eksport"}).status_code == 409
+
+
+def test_global_active_analyses_cap_429(
+    client: TestClient, agent: Agent, app: FastAPI, sf: sessionmaker[Session]
+) -> None:
+    app.dependency_overrides[get_app_settings] = lambda: make_settings(
+        max_contract_chars=200_000, max_active_analyses=1
+    )
+    busy, other = new_version(client), new_version(client)
+    with sf() as s:
+        uid = s.scalar(select(models.User.id).where(models.User.login.like("asystent-%")))
+        assert uid is not None
+        create_analysis(s, busy, uid, "fake")  # status queued — zajmuje jedyne miejsce
+        s.commit()
+    r = client.post(f"/api/versions/{other}/analyses")
+    assert r.status_code == 429
+    assert r.json()["type"] == "/problems/za_duzo_analiz"
+
+
+def test_background_analysis_logs_request_id(client: TestClient, app: FastAPI) -> None:
+    seen: dict[str, Any] = {}
+
+    class Peek:
+        async def run(self, ctx: AnalysisContext, tools: AgentTools) -> RunOutcome:
+            seen.update(structlog.contextvars.get_contextvars())
+            return RunOutcome("done", 1, 0.0, None)
+
+    app.dependency_overrides[get_runner] = lambda: Peek()
+    app.dependency_overrides[get_classifier] = lambda: FakeClassifier([])
+    vid = new_version(client)
+    r = client.post(f"/api/versions/{vid}/analyses", headers={"X-Request-ID": "zadanie-42"})
+    assert r.status_code == 202
+    assert seen.get("request_id") == "zadanie-42"

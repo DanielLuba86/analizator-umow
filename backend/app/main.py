@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, Response
 
 from app.api import actions, analyses, auth, contracts
 from app.api.errors import REQUEST_ID_HEADER, install_error_handlers, new_request_id
+from app.api.middleware import check_origin, limit_body
 from app.config import get_settings
 from app.repo.db import make_engine, session_factory
 from app.security.logging import configure_logging
@@ -43,6 +44,9 @@ def create_app(*, recover_interrupted: bool = True) -> FastAPI:
     configure_logging(get_settings().log_level)
     app = FastAPI(title="Analizator umów", lifespan=_lifespan)
     app.state.recover_interrupted = recover_interrupted
+    # Kolejność: później zarejestrowane działa wcześniej — request_id obejmuje wszystkie odpowiedzi.
+    app.middleware("http")(check_origin)
+    app.middleware("http")(limit_body(get_settings().max_body_bytes))
     app.middleware("http")(_request_id)
     install_error_handlers(app)
     app.include_router(auth.router)

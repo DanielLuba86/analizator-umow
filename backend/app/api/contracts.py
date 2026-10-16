@@ -92,8 +92,12 @@ def check_contract_text(text: str, settings: Settings) -> None:
         raise ApiError(413, "za_dlugi_tekst", "Tekst umowy przekracza dopuszczalną długość.")
 
 
-CONTRACT_NOT_FOUND = ApiError(404, "nie_znaleziono_umowy", "Nie znaleziono umowy.")
-VERSION_NOT_FOUND = ApiError(404, "nie_znaleziono_wersji", "Nie znaleziono wersji umowy.")
+def contract_not_found() -> ApiError:
+    return ApiError(404, "nie_znaleziono_umowy", "Nie znaleziono umowy.")
+
+
+def version_not_found() -> ApiError:
+    return ApiError(404, "nie_znaleziono_wersji", "Nie znaleziono wersji umowy.")
 
 
 @router.post("/contracts", status_code=201)
@@ -122,7 +126,7 @@ def list_contracts(db: DbDep) -> list[ContractListItem]:
 def get_contract(contract_id: int, db: DbDep) -> ContractOut:
     c = contracts_repo.get_contract(db, contract_id)
     if c is None:
-        raise CONTRACT_NOT_FOUND
+        raise contract_not_found()
     versions = [
         VersionListItem(id=v.id, nr=v.nr, created_at=v.created_at.isoformat())
         for v in contracts_repo.list_versions(db, contract_id)
@@ -135,7 +139,7 @@ def add_version(
     contract_id: int, body: VersionIn, db: DbDep, user: UserDep, settings: SettingsDep
 ) -> VersionCreated:
     if contracts_repo.get_contract(db, contract_id) is None:
-        raise CONTRACT_NOT_FOUND
+        raise contract_not_found()
     check_contract_text(body.text, settings)
     vid = contracts_repo.add_version(db, contract_id, body.text)
     nr = contracts_repo.get_version(db, vid).nr
@@ -148,7 +152,7 @@ def add_version(
 def get_version(version_id: int, db: DbDep) -> VersionOut:
     v = contracts_repo.find_version(db, version_id)
     if v is None:
-        raise VERSION_NOT_FOUND
+        raise version_not_found()
     fragments = [
         FragmentOut(id=f.id, label=f.label, start=f.start, end=f.end)
         for f in contracts_repo.list_fragments(db, version_id)

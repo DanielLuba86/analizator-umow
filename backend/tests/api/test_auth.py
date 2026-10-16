@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from api_helpers import PASSWORD, ApiClientFactory, make_settings
@@ -97,3 +98,20 @@ def test_garbage_cookie_is_401(anon: TestClient) -> None:
 def test_api_client_fixture_logs_in(api_client: ApiClientFactory) -> None:
     c = api_client("prawnik")
     assert c.get("/api/auth/me").json()["role"] == "prawnik"
+
+
+def test_login_deletes_expired_sessions(
+    anon: TestClient, make_user: Callable[[str, str], int], sf: sessionmaker[Session]
+) -> None:
+    uid = make_user("wygasly", "asystent")
+    with sf() as s:
+        s.add(
+            models.Session(
+                token_hash="0" * 64, user_id=uid, expires_at=datetime.now(UTC) - timedelta(1)
+            )
+        )
+        s.commit()
+    r = anon.post("/api/auth/login", json={"login": "wygasly", "password": PASSWORD})
+    assert r.status_code == 204
+    with sf() as s:
+        assert s.get(models.Session, "0" * 64) is None

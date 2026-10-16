@@ -1,5 +1,6 @@
 """Logowanie: sesja po stronie serwera, w przeglądarce tylko ciasteczko HttpOnly."""
 
+from datetime import UTC, datetime
 from functools import lru_cache
 
 from fastapi import APIRouter, Request, Response
@@ -10,12 +11,20 @@ from app.api.errors import ApiError
 from app.repo.audit import audit
 from app.repo.users import get_user_by_login
 from app.security.passwords import hash_password, verify_password
-from app.security.sessions import create_session, delete_session, resolve_session
+from app.security.sessions import (
+    create_session,
+    delete_expired_sessions,
+    delete_session,
+    resolve_session,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 COOKIE_PATH = "/api"
-BAD_CREDENTIALS = ApiError(401, "nieprawidlowe_dane_logowania", "Nieprawidłowy login lub hasło.")
+
+
+def bad_credentials() -> ApiError:
+    return ApiError(401, "nieprawidlowe_dane_logowania", "Nieprawidłowy login lub hasło.")
 
 
 class LoginIn(BaseModel):
@@ -43,7 +52,8 @@ def login(body: LoginIn, response: Response, db: DbDep, settings: SettingsDep) -
     if user is None or not password_ok:
         audit(db, user.id if user else None, "login_failed", "auth")
         db.commit()
-        raise BAD_CREDENTIALS
+        raise bad_credentials()
+    delete_expired_sessions(db, datetime.now(UTC))  # sprzątanie przy okazji logowania
     token = create_session(db, user.id, settings.session_ttl_hours)
     audit(db, user.id, "login", f"user:{user.id}")
     db.commit()

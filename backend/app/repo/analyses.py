@@ -27,6 +27,10 @@ class AnalysisAlreadyActive(Exception):
     """Dla wersji trwa już analiza (queued/running)."""
 
 
+class TooManyActiveAnalyses(Exception):
+    """W całej aplikacji trwa już limit analiz (ochrona kosztów API)."""
+
+
 class InvalidTransition(Exception):
     def __init__(self, old: str, new: str) -> None:
         super().__init__(f"{old} → {new}")
@@ -42,12 +46,24 @@ def active_analysis(s: Session, version_id: int) -> int | None:
     )
 
 
-def create_analysis(s: Session, version_id: int, started_by: int, model: str) -> int:
+def count_active(s: Session) -> int:
+    return s.execute(
+        select(func.count()).select_from(Analysis).where(Analysis.status.in_(ACTIVE_STATUSES))
+    ).scalar_one()
+
+
+def create_analysis(
+    s: Session, version_id: int, started_by: int, model: str, *, max_active: int | None = None
+) -> int:
     s.execute(
         select(ContractVersion.id).where(ContractVersion.id == version_id).with_for_update()
     ).one()
     if active_analysis(s, version_id) is not None:
         raise AnalysisAlreadyActive
+    # Limit globalny bez blokady: równoległe starty różnych wersji mogą go przekroczyć
+    # o kilka analiz — to ochrona kosztów, nie twardy przydział.
+    if max_active is not None and count_active(s) >= max_active:
+        raise TooManyActiveAnalyses
     a = Analysis(version_id=version_id, status="queued", model=model, started_by=started_by)
     s.add(a)
     s.flush()

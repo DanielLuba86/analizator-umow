@@ -42,18 +42,29 @@ class DecisionResult:
     export_id: int | None
 
 
-def request_user_action(s: Session, analysis: Analysis, typ: UserActionType, user_id: int) -> int:
+@dataclass(frozen=True)
+class RequestedAction:
+    id: int
+    created: bool  # False: zwrócono istniejący oczekujący wniosek
+
+
+def request_user_action(
+    s: Session, analysis: Analysis, typ: UserActionType, user_id: int
+) -> RequestedAction:
     """Idempotentnie: istniejący oczekujący wniosek tego typu jest zwracany zamiast nowego."""
     if not is_report_visible(s, analysis):
         raise ReportNotAvailable
+    pending = actions.latest_action(s, analysis.id, typ)
+    if pending is not None and pending.status == "oczekuje":
+        return RequestedAction(pending.id, created=False)
     payload = {"zrodlo": "uzytkownik", "user_id": user_id}
     try:
         with s.begin_nested():
             action_id = actions.request_action(s, analysis.id, typ, payload)
     except IntegrityError:  # równoległe żądanie wygrało wyścig o unikat (analiza, typ, oczekuje)
-        action_id = actions.request_action(s, analysis.id, typ, payload)
+        return RequestedAction(actions.request_action(s, analysis.id, typ, payload), created=False)
     audit(s, user_id, f"wniosek:{typ}", f"action:{action_id}")
-    return action_id
+    return RequestedAction(action_id, created=True)
 
 
 def export_content(s: Session, analysis: Analysis, approved_by: int) -> dict[str, Any]:
