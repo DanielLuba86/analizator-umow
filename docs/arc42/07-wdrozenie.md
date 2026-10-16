@@ -64,6 +64,7 @@ Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](..
   [`frontend/nginx.conf`](../../frontend/nginx.conf) trzeba odkomentować `set_real_ip_from`
   (sieć proxy) i `real_ip_header`. Bez tego limit logowania liczy adres proxy i wszyscy
   użytkownicy dzielą jeden limit 10 prób na minutę.
-- Obrazy bazowe są przypięte (`uv` po wersji i digeście, `nginx-unprivileged` po digeście);
+- Obrazy bazowe są przypięte po digeście (`python:3.14-slim`, `uv` także po wersji, `node:24-alpine`,
+  `nginx-unprivileged`);
   aktualizacje proponuje Dependabot.
 - CI (GitHub Actions) uruchamia testy backendu z PostgreSQL jako service container.
