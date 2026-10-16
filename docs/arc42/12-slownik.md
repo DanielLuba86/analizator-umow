@@ -7,7 +7,7 @@
 | `budget_exceeded` | Status analizy przerwanej limitem kroków, kosztu lub czasu; zweryfikowane tezy są zachowane i oznaczone jako niepełne. |
 | Cytat | Dosłowny fragment tekstu umowy wskazany przez tezę; weryfikowany po normalizacji wyłącznie białych znaków, minimum 12 znaków. |
 | Detektor wstrzyknięć | Etap przed agentem: heurystyki w domenie i klasyfikator Claude bez narzędzi. |
-| Eksport | Plik JSON z raportem analizy, tworzony po zatwierdzeniu wniosku `eksport`. |
+| Eksport | Raport analizy zamrożony po zatwierdzeniu wniosku `eksport`; do pobrania jako JSON albo PDF dla klienta (z banerem „wersja robocza”, jeśli raport nie jest oficjalną opinią). |
 | Fragment | Część wersji umowy o stałych granicach (`start`, `end`) i etykiecie, np. „Komparycja”, „§ 4 ust. 2”, „Akapit 3”. |
 | Kwarantanna | Stan analizy, w której wykryto możliwe wstrzyknięcie lub nie dało się go sprawdzić; raport jest ukryty do zatwierdzenia wniosku `kwarantanna`. |
 | Oficjalna opinia | Analiza oznaczona przez prawnika jako stanowisko kancelarii (zatwierdzony wniosek `opinia`). |

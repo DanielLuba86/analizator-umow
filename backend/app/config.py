@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 12
     cookie_secure: bool = True
     log_level: str = "INFO"
+    report_firm_name: str = "Kancelaria Przykładowa (dane fikcyjne)"  # nagłówek raportu PDF
     seed_assistant_password: SecretStr | None = None
     seed_lawyer_password: SecretStr | None = None
 

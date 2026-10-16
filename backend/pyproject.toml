@@ -13,10 +13,18 @@ dependencies = [
     "claude-agent-sdk",
     "anthropic",
     "structlog",
+    "fpdf2>=2.8.9",
 ]
 
 [dependency-groups]
-dev = ["pytest", "pytest-asyncio", "httpx", "ruff", "mypy"]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "ruff",
+    "mypy",
+    "pypdf>=6.21.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

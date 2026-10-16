@@ -229,7 +229,10 @@ function AnalysisActions({ analysisId }: { analysisId: number }) {
               <>
                 {" "}
                 <a href={`/api/exports/${a.export_id}`} download>
-                  Pobierz eksport
+                  Pobierz eksport (JSON)
+                </a>{" "}
+                <a href={`/api/exports/${a.export_id}/pdf`} download>
+                  Pobierz PDF
                 </a>
               </>
             )}
