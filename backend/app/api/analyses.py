@@ -21,7 +21,7 @@ from app.repo.analyses import AnalysisAlreadyActive, FindingRow, TooManyActiveAn
 from app.repo.audit import audit
 from app.services.analysis import run_analysis
 from app.services.comparison import VersionsOfDifferentContracts, compare_versions
-from app.services.reports import INCOMPLETE_STATUSES, quarantine_state, visible_findings
+from app.services.reports import is_incomplete, quarantine_state, visible_findings
 
 router = APIRouter(prefix="/api", tags=["analyses"], dependencies=[Depends(current_user)])
 
@@ -76,6 +76,7 @@ class AnalysisReport(BaseModel):
     version_id: int
     status: str
     reason: str | None
+    agent_reason: str | None  # wynik agenta, gdy nie zakończył normalnie (np. "turns", "api_error")
     turns: int | None
     cost_usd: float | None
     incomplete: bool
@@ -159,7 +160,8 @@ def get_report(analysis_id: int, db: DbDep) -> AnalysisReport:
         reason=a.reason,
         turns=a.turns,
         cost_usd=float(a.cost_usd) if a.cost_usd is not None else None,
-        incomplete=a.status in INCOMPLETE_STATUSES,
+        incomplete=is_incomplete(a),
+        agent_reason=a.agent_reason,
         official=a.official,
         quarantine=quarantine,
         findings=findings,

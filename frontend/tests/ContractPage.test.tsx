@@ -35,6 +35,7 @@ const REPORT = {
   version_id: 11,
   status: "done",
   reason: null,
+  agent_reason: null,
   turns: 2,
   cost_usd: 0.01,
   incomplete: false,

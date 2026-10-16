@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ApiError, apiFetch, errorMessage, postJson } from "../api/client";
 import type { Decision, PendingAction } from "../api/types";
 import { quarantineReason } from "../document/quarantine";
+import { useBusy } from "../useBusy";
 
 const ALREADY_DECIDED = "Wniosek został już rozstrzygnięty.";
 
@@ -82,21 +83,16 @@ export function ApprovalsPage() {
 }
 
 function ActionRow({ action, onDecide }: { action: PendingAction; onDecide: (body: object) => Promise<void> }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, guard] = useBusy();
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const isTemplate = action.typ === "wzorzec";
   const templateReady = name.trim() !== "" && text.trim() !== "";
 
-  async function run(approve: boolean) {
-    setBusy(true);
-    try {
-      await onDecide(
-        approve && isTemplate ? { approve, template: { nazwa_klauzuli: name, tresc: text } } : { approve },
-      );
-    } finally {
-      setBusy(false);
-    }
+  function run(approve: boolean) {
+    void guard(() =>
+      onDecide(approve && isTemplate ? { approve, template: { nazwa_klauzuli: name, tresc: text } } : { approve }),
+    );
   }
 
   return (

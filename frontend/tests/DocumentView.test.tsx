@@ -34,6 +34,7 @@ function analysis(over: Partial<Analysis> = {}): Analysis {
     version_id: 1,
     status: "done",
     reason: null,
+    agent_reason: null,
     turns: 3,
     cost_usd: 0.02,
     incomplete: false,

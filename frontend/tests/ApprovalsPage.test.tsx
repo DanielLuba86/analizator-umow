@@ -1,9 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "../src/App";
 import { ApprovalsPage } from "../src/pages/ApprovalsPage";
-import { ASYSTENT, PRAWNIK, mockFetch, problem } from "./helpers";
+import { ASYSTENT, PRAWNIK, deferred, json, mockFetch, problem } from "./helpers";
 
 function action(id: number, typ: string, payload: Record<string, unknown>) {
   return {
@@ -166,18 +166,20 @@ test("expired session returns to the login form", async () => {
   expect(screen.queryByRole("button", { name: "Wyloguj" })).toBeNull();
 });
 
-test("double click on approve sends one decision", async () => {
-  const fetch = mockFetch([
-    { path: "/api/actions?status=oczekuje", body: PENDING },
-    {
-      method: "POST",
-      path: "/api/actions/1/decision",
-      body: { id: 1, status: "zatwierdzona", export_id: null },
-    },
-  ]);
+test("second approve while the decision is in flight is ignored", async () => {
+  const pending = deferred();
+  const routes = mockFetch([{ path: "/api/actions?status=oczekuje", body: PENDING }]);
+  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+    init?.method === "POST" ? pending.promise : routes(input, init),
+  );
+  vi.stubGlobal("fetch", fetch);
   render(<ApprovalsPage />);
   const row = await screen.findByRole("row", { name: /kwarantanna/ });
-  await userEvent.dblClick(within(row).getByRole("button", { name: "Zatwierdź" }));
+  const approve = within(row).getByRole("button", { name: "Zatwierdź" });
+  const reject = within(row).getByRole("button", { name: "Odrzuć" });
+  fireEvent.click(approve);
+  fireEvent.click(reject); // inny przycisk tego samego wiersza też musi czekać
+  pending.release(json(200, { id: 1, status: "zatwierdzona", export_id: null }));
   await waitFor(() => expect(screen.queryByRole("row", { name: /kwarantanna/ })).toBeNull());
-  expect(fetch.mock.calls.filter(([url]) => url === "/api/actions/1/decision")).toHaveLength(1);
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
