@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -23,12 +24,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # obraz python:slim nie ma curl; start_period obejmuje migracje przed startem uvicorn
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     # bez ports: backend jest dostępny tylko przez nginx (CSP, limit logowania, limit rozmiaru)
 
   frontend:
     build: frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "8080:8080"
 
