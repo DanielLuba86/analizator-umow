@@ -1,15 +1,26 @@
+import re
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_FOUNDRY_RESOURCE = re.compile(r"[a-z0-9][a-z0-9-]{1,62}")
 
 
 class Settings(BaseSettings):
     # env_ignore_empty: `KLUCZ=` z .env.example oznacza „nie ustawiono”, nie pusty napis.
-    model_config = SettingsConfigDict(extra="ignore", env_ignore_empty=True)
+    # hide_input_in_errors: błąd walidacji nie może pokazać sekretu ani wartości z .env.
+    model_config = SettingsConfigDict(
+        extra="ignore", env_ignore_empty=True, hide_input_in_errors=True
+    )
 
     database_url: str
     anthropic_api_key: SecretStr | None = None
+    # Dostawca modelu dla agenta i klasyfikatora (ADR 0009).
+    llm_provider: Literal["anthropic", "foundry"] = "anthropic"
+    anthropic_foundry_api_key: SecretStr | None = None
+    anthropic_foundry_resource: str | None = None  # sama nazwa zasobu Foundry, nie URL
     agent_model: str = "claude-opus-5-5"
     classifier_model: str = "claude-haiku-5-5"
     agent_max_turns: int = 30
@@ -24,6 +35,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     seed_assistant_password: SecretStr | None = None
     seed_lawyer_password: SecretStr | None = None
+
+    @field_validator("anthropic_foundry_resource")
+    @classmethod
+    def _foundry_resource_is_bare_name(cls, value: str | None) -> str | None:
+        if value is not None and not _FOUNDRY_RESOURCE.fullmatch(value):
+            raise ValueError("ANTHROPIC_FOUNDRY_RESOURCE: podaj samą nazwę zasobu Foundry")
+        return value
 
 
 @lru_cache

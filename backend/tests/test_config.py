@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from app.config import Settings
 
@@ -23,6 +24,8 @@ def test_settings_defaults() -> None:
     assert s.session_ttl_hours == 12
     assert s.cookie_secure is True  # bezpieczne domyślnie; lokalne HTTP wyłącza je w .env
     assert s.log_level == "INFO"
+    assert s.llm_provider == "anthropic"
+    assert (s.anthropic_foundry_api_key, s.anthropic_foundry_resource) == (None, None)
 
 
 def test_settings_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -46,3 +49,44 @@ def test_empty_env_values_mean_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     s = Settings(database_url=URL)
     assert s.anthropic_api_key is None
     assert s.seed_lawyer_password is None
+
+
+def test_foundry_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "foundry")
+    monkeypatch.setenv("ANTHROPIC_FOUNDRY_API_KEY", "k")
+    monkeypatch.setenv("ANTHROPIC_FOUNDRY_RESOURCE", "moj-zasob")
+    s = Settings(database_url=URL)
+    assert s.llm_provider == "foundry"
+    assert s.anthropic_foundry_api_key is not None
+    assert s.anthropic_foundry_api_key.get_secret_value() == "k"
+    assert s.anthropic_foundry_resource == "moj-zasob"
+
+
+@pytest.mark.parametrize(
+    "resource",
+    [
+        "https://moj-zasob.services.ai.azure.com/anthropic",
+        "moj-zasob.services.ai.azure.com",
+        "Moj-Zasob",
+        "moj-zasob ",
+    ],
+)
+def test_foundry_resource_rejects_url_host_uppercase_and_trailing_space(resource: str) -> None:
+    with pytest.raises(ValidationError) as exc:
+        Settings(database_url=URL, anthropic_foundry_resource=resource)
+    assert "samą nazwę zasobu" in str(exc.value)
+    assert resource.strip() not in str(exc.value)
+
+
+def test_empty_foundry_resource_is_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_FOUNDRY_RESOURCE", "")
+    assert Settings(database_url=URL).anthropic_foundry_resource is None
+
+
+@pytest.mark.parametrize("provider", ["bedrock", "Foundry"])
+def test_unknown_or_capitalized_provider_rejected(
+    monkeypatch: pytest.MonkeyPatch, provider: str
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", provider)
+    with pytest.raises(ValidationError):
+        Settings(database_url=URL)
