@@ -45,7 +45,7 @@
 - `provider.agent_credentials_env(settings: Settings) -> dict[str, str]` (przy braku danych logowania: `ValueError("brak danych logowania dostawcy")`)
 - `provider.classifier_client(settings: Settings) -> anthropic.AsyncAnthropic | anthropic.AsyncAnthropicFoundry` (przy braku danych logowania: ten sam `ValueError`)
 
-- [ ] **Krok 1 (testy, RED):**
+- [x] **Krok 1 (testy, RED):**
   - `test_config.py`:
     - `test_settings_defaults` rozszerzony o `llm_provider == "anthropic"` i oba pola Foundry `None`;
     - `test_foundry_settings_from_env` (`LLM_PROVIDER=foundry`, `ANTHROPIC_FOUNDRY_API_KEY=k`, `ANTHROPIC_FOUNDRY_RESOURCE=moj-zasob`);
@@ -60,10 +60,10 @@
     - `test_classifier_client_foundry` (`isinstance(c, anthropic.AsyncAnthropicFoundry)`, `str(c.base_url) == "https://moj-zasob.services.ai.azure.com/anthropic/"`, `c.api_key == "k-f"`);
     - `test_classifier_client_anthropic` (`type(c) is anthropic.AsyncAnthropic`, `c.api_key == "sk-a"`).
   - Ustawienia budować przez `Settings(database_url=URL, ...)` po wyczyszczeniu zmiennych środowiskowych, jak w istniejącym `test_config.py`.
-- [ ] **Krok 2:** uruchomić `uv run pytest -q tests/test_config.py tests/agent/test_provider.py`. Oczekiwane: FAIL (brak pól lub modułu).
-- [ ] **Krok 3:** implementacja pól i walidatora w `config.py` oraz trzech funkcji w `provider.py`. Klienta budować z jawnie podanymi argumentami (`api_key=`, `resource=`), nigdy z odczytu środowiska w SDK.
-- [ ] **Krok 4:** pełny `pytest`, ruff, mypy. Oczekiwane: wszystko zielone.
-- [ ] **Krok 5:** commit „Dodaj ustawienia i moduł dostawcy modelu (Anthropic, Microsoft Foundry)”.
+- [x] **Krok 2:** uruchomić `uv run pytest -q tests/test_config.py tests/agent/test_provider.py`. Oczekiwane: FAIL (brak pól lub modułu).
+- [x] **Krok 3:** implementacja pól i walidatora w `config.py` oraz trzech funkcji w `provider.py`. Klienta budować z jawnie podanymi argumentami (`api_key=`, `resource=`), nigdy z odczytu środowiska w SDK.
+- [x] **Krok 4:** pełny `pytest`, ruff, mypy. Oczekiwane: wszystko zielone.
+- [x] **Krok 5:** commit „Dodaj ustawienia i moduł dostawcy modelu (Anthropic, Microsoft Foundry)”.
 
 ### Task 2: Runner agenta i klasyfikator korzystają z dostawcy
 
@@ -73,7 +73,7 @@
 
 **Interfejsy:** konsumuje `has_credentials`, `agent_credentials_env` i `classifier_client` z zadania 1. Zmienia `sdk_runner.agent_env(api_key: str)` na `agent_env(settings: Settings) -> dict[str, str]`: wyczyszczone zmienne spoza `ENV_ALLOWLIST` plus `agent_credentials_env(settings)`.
 
-- [ ] **Krok 1 (testy, RED):**
+- [x] **Krok 1 (testy, RED):**
   - `test_sdk_options.py`:
     - `test_agent_env_foundry_blanks_inherited_anthropic_key`: środowisko wyczyszczone, potem `PATH`, `ANTHROPIC_API_KEY=z-otoczenia`, `DATABASE_URL=...`; ustawienia Foundry. Oczekiwane `_options(settings).env == {"ANTHROPIC_API_KEY": "", "DATABASE_URL": "", "CLAUDE_CODE_USE_FOUNDRY": "1", "ANTHROPIC_FOUNDRY_RESOURCE": "moj-zasob", "ANTHROPIC_FOUNDRY_API_KEY": "k-f"}`;
     - `test_missing_foundry_key_fails_with_brak_klucza` (foundry z zasobem, bez klucza; `("failed", "brak_klucza_api")`);
@@ -81,32 +81,32 @@
   - `test_classifier.py`:
     - `test_foundry_without_foundry_key_is_unavailable` (foundry, ustawiony tylko `anthropic_api_key`; `ClassifierUnavailable`);
     - `test_foundry_classifier_uses_foundry_client` (`AnthropicClassifier(settings)._get_client()` to instancja `AsyncAnthropicFoundry`).
-- [ ] **Krok 2:** uruchomić `uv run pytest -q tests/agent`. Oczekiwane: nowe testy FAIL.
-- [ ] **Krok 3:** implementacja:
+- [x] **Krok 2:** uruchomić `uv run pytest -q tests/agent`. Oczekiwane: nowe testy FAIL.
+- [x] **Krok 3:** implementacja:
   - `build_options`: `if not has_credentials(settings): raise ValueError("brak danych logowania dostawcy")`, potem `env=agent_env(settings)`;
   - `SdkAgentRunner.run`: warunek `not has_credentials(self._settings)` → `NO_API_KEY`;
   - `AnthropicClassifier._get_client`: przy braku danych logowania `ClassifierUnavailable("brak_klucza")`, w przeciwnym razie `classifier_client(settings)`;
   - usunąć bezpośredni import i użycie `anthropic.AsyncAnthropic` w `classifier.py`, jeśli przestaną być potrzebne.
-- [ ] **Krok 4:** pełny `pytest`, ruff, mypy. Oczekiwane: zielone.
-- [ ] **Krok 5 (weryfikacja bez kosztów):** sonda ze skryptu w scratchpadzie (jak próba w PR #9): `SdkAgentRunner` z ustawieniami `llm_provider="foundry"`, `anthropic_foundry_api_key="fałszywy"`, `anthropic_foundry_resource="nie-istnieje-analizator"`, `agent_timeout_s=60` i atrapą narzędzi. Oczekiwane: `runner.init_tools` to dokładnie 5 nazw `mcp__umowy__*`, a wynik ma status `failed`. Wynik zapisać w opisie PR.
-- [ ] **Krok 6:** commit „Łącz agenta i klasyfikator z wybranym dostawcą modelu”.
+- [x] **Krok 4:** pełny `pytest`, ruff, mypy. Oczekiwane: zielone.
+- [x] **Krok 5 (weryfikacja bez kosztów):** sonda ze skryptu w scratchpadzie (jak próba w PR #9): `SdkAgentRunner` z ustawieniami `llm_provider="foundry"`, `anthropic_foundry_api_key="fałszywy"`, `anthropic_foundry_resource="nie-istnieje-analizator"`, `agent_timeout_s=60` i atrapą narzędzi. Oczekiwane: `runner.init_tools` to dokładnie 5 nazw `mcp__umowy__*`, a wynik ma status `failed`. Wynik zapisać w opisie PR.
+- [x] **Krok 6:** commit „Łącz agenta i klasyfikator z wybranym dostawcą modelu”.
 
 ### Task 3: Dokumentacja
 
 **Pliki:** `.env.example`, `README.md`, `docs/threat-model.md` (T15), `docs/adr/0009-dostawca-modelu-jako-ustawienie.md` (nowy, format jak 0007), `docs/arc42/09-decyzje.md` (wiersz 0009), `docs/arc42/07-wdrozenie.md` (lista konfiguracji).
 
-- [ ] **Krok 1:** `.env.example`: pod `ANTHROPIC_API_KEY=` dodać `LLM_PROVIDER=anthropic` z komentarzem `# anthropic | foundry`, a pod nim `ANTHROPIC_FOUNDRY_API_KEY=` i `ANTHROPIC_FOUNDRY_RESOURCE=` z komentarzem „tylko dla LLM_PROVIDER=foundry; sama nazwa zasobu, nie URL”.
-- [ ] **Krok 2:** README, sekcja „Microsoft Foundry” po konfiguracji `.env`:
+- [x] **Krok 1:** `.env.example`: pod `ANTHROPIC_API_KEY=` dodać `LLM_PROVIDER=anthropic` z komentarzem `# anthropic | foundry`, a pod nim `ANTHROPIC_FOUNDRY_API_KEY=` i `ANTHROPIC_FOUNDRY_RESOURCE=` z komentarzem „tylko dla LLM_PROVIDER=foundry; sama nazwa zasobu, nie URL”.
+- [x] **Krok 2:** README, sekcja „Microsoft Foundry” po konfiguracji `.env`:
   - zasób Foundry z dwoma wdrożeniami o nazwach `claude-opus-5-5` i `claude-haiku-5-5` (inne nazwy psują szacowanie kosztu, więc i `AGENT_MAX_BUDGET_USD`);
   - klucz i nazwa zasobu z „Endpoints and keys”;
   - trzy zmienne w `.env`;
   - informacja, że koszt rozlicza Microsoft według stawek Claude API.
-- [ ] **Krok 3:** T15: w kolumnie obrony „Proces agenta dostaje dane logowania wybranego dostawcy (klucz Claude API albo klucz i nazwę zasobu Foundry)”; do kolumny testów dopisać `tests/agent/test_sdk_options.py::test_agent_env_foundry_blanks_inherited_anthropic_key`. ADR 0009 (kontekst, decyzja `LLM_PROVIDER`, odrzucone opcje ze specu, konsekwencje). Wiersz w arc42 §9. W §7 punkt „dostawca modelu (`LLM_PROVIDER`) i jego dane logowania”.
-- [ ] **Krok 4:** `python3 scripts/check_docs.py` → `błędów: 0`; `cd backend && uv run python ../scripts/check_threat_model.py` → `błędów: 0`.
-- [ ] **Krok 5:** commit „Opisz konfigurację Microsoft Foundry”.
+- [x] **Krok 3:** T15: w kolumnie obrony „Proces agenta dostaje dane logowania wybranego dostawcy (klucz Claude API albo klucz i nazwę zasobu Foundry)”; do kolumny testów dopisać `tests/agent/test_sdk_options.py::test_agent_env_foundry_blanks_inherited_anthropic_key`. ADR 0009 (kontekst, decyzja `LLM_PROVIDER`, odrzucone opcje ze specu, konsekwencje). Wiersz w arc42 §9. W §7 punkt „dostawca modelu (`LLM_PROVIDER`) i jego dane logowania”.
+- [x] **Krok 4:** `python3 scripts/check_docs.py` → `błędów: 0`; `cd backend && uv run python ../scripts/check_threat_model.py` → `błędów: 0`.
+- [x] **Krok 5:** commit „Opisz konfigurację Microsoft Foundry”.
 
 ### Task 4: Weryfikacja końcowa i PR
 
-- [ ] **Krok 1:** frontend bez zmian, ale dla pewności `cd frontend && npx vitest run`.
-- [ ] **Krok 2:** przegląd całej gałęzi przez świeżego recenzenta, poprawki Critical i Important.
-- [ ] **Krok 3:** push, PR „Obsługa Microsoft Foundry”, zielone CI. Merge po decyzji użytkownika. Prawdziwy test na Foundry (`--smoke`) dopiero na zasobie użytkownika, za jego zgodą.
+- [x] **Krok 1:** frontend bez zmian, ale dla pewności `cd frontend && npx vitest run`.
+- [x] **Krok 2:** przegląd całej gałęzi przez świeżego recenzenta, poprawki Critical i Important.
+- [x] **Krok 3:** push, PR „Obsługa Microsoft Foundry”, zielone CI. Merge po decyzji użytkownika. Prawdziwy test na Foundry (`--smoke`) dopiero na zasobie użytkownika, za jego zgodą.
