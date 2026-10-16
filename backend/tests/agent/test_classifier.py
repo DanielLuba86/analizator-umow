@@ -15,6 +15,7 @@ from app.agent.classifier import (
     ClassifierUnavailable,
     FakeClassifier,
 )
+from app.agent.provider import classifier_client
 from app.config import Settings
 from app.domain.fragments import Fragment
 
@@ -26,11 +27,12 @@ FRAGS = [
 ]
 
 
-def _settings(key: str | None = "sk-test") -> Settings:
+def _settings(key: str | None = "sk-test", **kw: Any) -> Settings:
     return Settings(
         database_url="postgresql+psycopg://u:p@localhost/db",
         anthropic_api_key=SecretStr(key) if key else None,
         classifier_model="claude-test-haiku",
+        **kw,
     )
 
 
@@ -141,3 +143,51 @@ def test_foundry_without_foundry_key_is_unavailable() -> None:
 def test_foundry_classifier_uses_foundry_client() -> None:
     client = AnthropicClassifier(_foundry("k-f"))._get_client()
     assert isinstance(client, anthropic.AsyncAnthropicFoundry)
+
+
+OVERLOADED = {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}
+
+
+def _message(text: str) -> dict[str, Any]:
+    return {
+        "id": "msg_1",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-test-haiku",
+        "content": [{"type": "text", "text": text}],
+        "stop_reason": "end_turn",
+        "stop_sequence": None,
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+
+
+def _flaky_client(settings: Settings, failures: int) -> tuple[Any, list[int]]:
+    """Prawdziwy klient SDK z transportem: `failures` razy 529, potem poprawna odpowiedź."""
+    calls: list[int] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls.append(1)
+        if len(calls) <= failures:  # retry-after-ms: test nie czeka na backoff SDK
+            return httpx2.Response(529, json=OVERLOADED, headers={"retry-after-ms": "1"})
+        return httpx2.Response(200, json=_message(_hits_json()))
+
+    client = classifier_client(settings).with_options(
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    )
+    return client, calls
+
+
+async def test_transient_overload_is_retried() -> None:
+    """4 przeciążenia z rzędu: więcej niż domyślne 2 ponowienia SDK, mniej niż nasze 5."""
+    settings = _settings()
+    client, calls = _flaky_client(settings, failures=4)
+    assert await AnthropicClassifier(settings, client=client).classify(FRAGS) == []
+    assert len(calls) == 5
+
+
+async def test_retries_exhausted_is_unavailable() -> None:
+    settings = _settings(classifier_max_retries=1)
+    client, calls = _flaky_client(settings, failures=5)
+    with pytest.raises(ClassifierUnavailable):
+        await AnthropicClassifier(settings, client=client).classify(FRAGS)
+    assert len(calls) == 2

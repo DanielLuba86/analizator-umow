@@ -16,4 +16,4 @@
 |---|---|---|
 | Brak limitu analiz na użytkownika | Jeden użytkownik może zająć cały limit globalny | Licznik aktywnych analiz per `started_by` |
 | Analizy w `BackgroundTasks` jednego procesu | Brak skalowania poziomego; restart przerywa analizy | Kolejka zadań (np. arq, Celery), gdy wzrośnie ruch |
-| Ponowienia wywołań Claude API tylko w domyślnej polityce SDK | Przejściowy błąd kończy analizę statusem `failed` | Własna polityka ponowień z backoffem dla błędów 429/5xx |
+| Ponowienia wywołań Claude API tylko wewnątrz jednego przebiegu (`CLASSIFIER_MAX_RETRIES`, `AGENT_MAX_RETRIES`) | Awaria dłuższa niż ponowienia kończy analizę kwarantanną (klasyfikator) albo statusem `failed` (agent); trzeba ręcznie uruchomić analizę ponownie albo zwolnić kwarantannę | Automatyczne ponowne uruchomienie analizy po awarii, z rozwiązaniem duplikatów tez z pierwszego przebiegu |

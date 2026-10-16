@@ -2,7 +2,7 @@ import re
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Reguła CLI Claude Code: 2–64 znaki, litery, cyfry i myślniki, bez myślnika na brzegach.
@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     agent_max_budget_usd: float = 0.50
     agent_max_findings: int = 60
     agent_timeout_s: int = 300
+    # Ponowienia przy 429/5xx/zerwanym połączeniu, z rosnącym odstępem po stronie SDK i CLI.
+    # Klasyfikator: wyczerpane ponowienia → kwarantanna, więc więcej niż domyślne 2 SDK.
+    classifier_max_retries: int = Field(default=5, ge=0, le=10)
+    agent_max_retries: int = Field(default=10, ge=0, le=20)  # CLAUDE_CODE_MAX_RETRIES agenta
     max_contract_chars: int = 200_000
     max_body_bytes: int = 1_048_576  # ciało żądania; nginx ma ten sam limit (client_max_body_size)
     max_active_analyses: int = 5  # analizy queued/running naraz w całej aplikacji (koszt API)

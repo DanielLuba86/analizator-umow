@@ -72,3 +72,9 @@ def test_classifier_client_anthropic() -> None:
 def test_classifier_client_without_credentials_raises() -> None:
     with pytest.raises(ValueError, match="brak danych logowania"):
         classifier_client(_settings())
+
+
+@pytest.mark.parametrize("kw", [{"anthropic_api_key": SecretStr("sk-a")}, FOUNDRY])
+def test_classifier_client_retries_from_settings(kw: dict[str, Any]) -> None:
+    assert classifier_client(_settings(**kw)).max_retries == 5
+    assert classifier_client(_settings(**kw, classifier_max_retries=7)).max_retries == 7
