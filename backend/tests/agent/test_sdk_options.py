@@ -150,7 +150,7 @@ def test_agent_env_blanks_everything_but_allowlist(monkeypatch: pytest.MonkeyPat
 
 
 def test_build_options_requires_api_key() -> None:
-    with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
+    with pytest.raises(ValueError, match="brak danych logowania"):
         _options(_settings(anthropic_api_key=None))
 
 
@@ -339,3 +339,38 @@ async def test_sdk_error_reason_is_class_name_without_message() -> None:
     runner = SdkAgentRunner(_settings(), query_fn=broken)
     out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
     assert (out.status, out.reason) == ("failed", "CLIConnectionError")
+
+
+FOUNDRY: dict[str, Any] = {
+    "llm_provider": "foundry",
+    "anthropic_api_key": None,
+    "anthropic_foundry_api_key": SecretStr("k-f"),
+    "anthropic_foundry_resource": "moj-zasob",
+}
+
+
+def test_agent_env_foundry_blanks_inherited_anthropic_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Przy Foundry agent nie może dostać odziedziczonego klucza Claude API."""
+    for name in list(os.environ):
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "z-otoczenia")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:haslo@db/x")
+    assert _options(_settings(**FOUNDRY)).env == {
+        "ANTHROPIC_API_KEY": "",
+        "DATABASE_URL": "",
+        "CLAUDE_CODE_USE_FOUNDRY": "1",
+        "ANTHROPIC_FOUNDRY_RESOURCE": "moj-zasob",
+        "ANTHROPIC_FOUNDRY_API_KEY": "k-f",
+    }
+
+
+async def test_missing_foundry_key_fails_with_brak_klucza() -> None:
+    settings = _settings(
+        **{**FOUNDRY, "anthropic_foundry_api_key": None, "anthropic_api_key": SecretStr("sk-a")}
+    )
+    runner = SdkAgentRunner(settings, query_fn=fake_query([], {}))
+    out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
+    assert (out.status, out.reason) == ("failed", "brak_klucza_api")

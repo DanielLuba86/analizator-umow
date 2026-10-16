@@ -12,6 +12,7 @@ Decyzje są zapisane jako krótkie ADR w formacie MADR w katalogu [`docs/adr/`](
 | [0006](../adr/0006-postgresql-w-docker-compose.md) | PostgreSQL w docker-compose | Transakcje i blokady wierszy; testy na prawdziwym Postgresie |
 | [0007](../adr/0007-zadania-w-tle-bez-kolejki.md) | Zadania w tle bez zewnętrznej kolejki | Prosty deployment; jedna instancja backendu, sprzątanie przerwanych analiz przy starcie |
 | [0008](../adr/0008-sesje-httponly-i-dwie-role.md) | Sesje po stronie serwera w ciasteczku HttpOnly i dwie role | Brak tokenów w JavaScript; unieważnienie sesji po stronie serwera |
+| [0009](../adr/0009-dostawca-modelu-jako-ustawienie.md) | Dostawca modelu (Claude API albo Microsoft Foundry) wybierany ustawieniem `LLM_PROVIDER` | Jeden moduł rozróżnia dostawców; agent dostaje dane logowania tylko wybranego dostawcy |
 
 Mniejsze decyzje podjęte w trakcie implementacji (np. kształt odpowiedzi API, widoczność raportu,
 router frontendu) są opisane w opisach pull requestów poszczególnych faz.

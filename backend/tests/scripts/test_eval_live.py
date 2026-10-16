@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 from db_env import Env
 
@@ -141,3 +142,26 @@ async def first_fragment_with(env: Env, path: Path, quote: str) -> str:
     with env.sf() as s:
         frags = list_fragments(s, vid)
         return next(f.id for f in frags if quote in text[f.start : f.end])
+
+
+def test_main_runs_with_foundry_credentials(monkeypatch: Any) -> None:
+    """Ewaluacja na żywo działa także z Microsoft Foundry, bez klucza Claude API."""
+    from pydantic import SecretStr
+
+    settings = Settings(
+        database_url="postgresql+psycopg://u:p@localhost/db",
+        llm_provider="foundry",
+        anthropic_foundry_api_key=SecretStr("k-f"),
+        anthropic_foundry_resource="moj-zasob",
+    )
+    started: list[Settings] = []
+
+    async def fake_run_all(s: Settings) -> list[Any]:
+        started.append(s)
+        return []
+
+    monkeypatch.setattr(ev, "get_settings", lambda: settings)
+    monkeypatch.setattr(ev, "run_all", fake_run_all)
+    monkeypatch.setattr(sys, "argv", ["eval_live.py", "--zgoda-na-koszt"])
+    assert ev.main() == 0
+    assert started == [settings]

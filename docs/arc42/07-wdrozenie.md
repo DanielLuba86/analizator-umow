@@ -31,7 +31,7 @@ flowchart LR
 
 Pełna instrukcja jest w [README](../../README.md). W skrócie:
 
-1. `cp .env.example .env` i uzupełnienie `ANTHROPIC_API_KEY` oraz haseł.
+1. `cp .env.example .env` i uzupełnienie danych logowania dostawcy modelu (`ANTHROPIC_API_KEY` albo ustawień Foundry) oraz haseł.
 2. `docker compose up -d --build` — backend przy starcie wykonuje migracje.
 3. `docker compose exec backend python -m app.repo.seed` — wzorce klauzul i konta demo.
 
@@ -43,7 +43,7 @@ Migracje muszą poprzedzać start aplikacji, bo przy starcie oznacza ona przerwa
 Wszystkie ustawienia pochodzą ze zmiennych środowiskowych ([`.env.example`](../../.env.example)):
 
 - połączenie z bazą;
-- klucz Anthropic;
+- dostawca modelu (`LLM_PROVIDER`: Claude API albo Microsoft Foundry) i jego dane logowania;
 - modele;
 - limity agenta;
 - maksymalna długość umowy i rozmiar ciała żądania;

@@ -13,6 +13,7 @@ import anthropic
 import structlog
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from app.agent.provider import classifier_client, has_credentials
 from app.agent.tools import wrap_fragment
 from app.config import Settings
 from app.domain.fragments import Fragment
@@ -91,10 +92,9 @@ class AnthropicClassifier:
 
     def _get_client(self) -> Any:
         if self._client is None:
-            key = self._settings.anthropic_api_key
-            if key is None:
+            if not has_credentials(self._settings):
                 raise ClassifierUnavailable("brak_klucza")
-            self._client = anthropic.AsyncAnthropic(api_key=key.get_secret_value())
+            self._client = classifier_client(self._settings)
         return self._client
 
     async def classify(self, fragments: Sequence[tuple[Fragment, str]]) -> list[ClassifierHit]:

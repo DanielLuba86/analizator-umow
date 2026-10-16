@@ -32,6 +32,7 @@ from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 from app.agent.classifier import AnthropicClassifier, InjectionClassifier  # noqa: E402
+from app.agent.provider import has_credentials  # noqa: E402
 from app.agent.runner import AgentRunner  # noqa: E402
 from app.agent.sdk_runner import SdkAgentRunner  # noqa: E402
 from app.config import Settings, get_settings  # noqa: E402
@@ -211,8 +212,8 @@ def main() -> int:
     if not args.zgoda_na_koszt:
         print("Bez --zgoda-na-koszt nic nie uruchamiam.")
         return 2
-    if settings.anthropic_api_key is None or not settings.anthropic_api_key.get_secret_value():
-        print("Brak ANTHROPIC_API_KEY.")
+    if not has_credentials(settings):
+        print(f"Brak danych logowania dostawcy (LLM_PROVIDER={settings.llm_provider}).")
         return 2
     results = asyncio.run(run_all(settings))
     print_report(results)
