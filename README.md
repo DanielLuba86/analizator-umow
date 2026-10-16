@@ -127,6 +127,18 @@ npm run lint && npx tsc --noEmit
 
 Po testach zatrzymaj bazę testową: `docker stop analizator-testdb` (kontener usunie się sam).
 
+Test E2E całego stosu docker compose (około minuty, bez klucza API i bez kosztów):
+
+```bash
+python3 scripts/e2e_compose.py
+```
+
+Test buduje osobny projekt compose `analizator-e2e` na porcie 18080 z plikiem env utworzonym
+z `.env.example`, więc nie używa lokalnego `.env` i nie zatrzymuje działającej aplikacji. Sprawdza
+start stosu, logowanie za nginx (Origin, limit prób), kwarantannę analizy bez klucza API oraz to,
+że nginx działa bez backendu i po zmianie jego adresu IP. Na koniec usuwa stos (`E2E_KEEP=1`
+go zostawia).
+
 Dokumentacja (12 sekcji arc42, diagramy Mermaid, linki):
 
 ```bash

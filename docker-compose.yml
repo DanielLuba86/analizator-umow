@@ -17,7 +17,8 @@ services:
   backend:
     build: backend
     restart: unless-stopped
-    env_file: .env
+    # ENV_FILE i APP_PORT: test E2E (scripts/e2e_compose.py) podaje własny plik bez klucza API.
+    env_file: ${ENV_FILE:-.env}
     volumes:
       # wzorce klauzul dla seeda (app/repo/seed.py: DEFAULT_TEMPLATES_PATH → /data/wzorce w obrazie)
       - ./data/wzorce:/data/wzorce:ro
@@ -40,7 +41,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
 
 volumes:
   pgdata:
