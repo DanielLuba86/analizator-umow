@@ -39,7 +39,7 @@ export function NewVersionForm({ contractId, onCreated }: Props) {
   }
 
   return (
-    <form className="new-version" onSubmit={onSubmit}>
+    <form className="new-version card" onSubmit={onSubmit}>
       <h3>Nowa wersja</h3>
       <label>
         Plik (.md, .txt)
@@ -49,7 +49,7 @@ export function NewVersionForm({ contractId, onCreated }: Props) {
         Tekst nowej wersji
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} required />
       </label>
-      <button type="submit" disabled={busy}>
+      <button type="submit" className="primary" disabled={busy}>
         Dodaj wersję
       </button>
       {error && (

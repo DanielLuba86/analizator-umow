@@ -36,15 +36,15 @@ export function RiskReport({ analysis, fragments, selectedId = null, onSelect, o
   const findings = [...analysis.findings].sort((a, b) => riskRank(a) - riskRank(b) || a.id - b.id);
 
   return (
-    <section className="report" aria-label="Raport ryzyka">
+    <section className="report card" aria-label="Raport ryzyka">
       <p className="status">
-        Status analizy: <strong>{STATUS_LABELS[analysis.status]}</strong>
+        Status analizy: <strong className={`pill status-${analysis.status}`}>{STATUS_LABELS[analysis.status]}</strong>
         {analysis.official && " · oficjalna opinia"}
       </p>
       {hidden && (
         <p role="alert" className="banner quarantine">
-          Analiza jest w kwarantannie: {quarantineReason(analysis.reason)}. Wyniki pozostaną ukryte,
-          dopóki prawnik nie zatwierdzi wniosku o ich udostępnienie.
+          Analiza jest w kwarantannie: {quarantineReason(analysis.reason)}. Wyniki pozostaną ukryte, dopóki prawnik nie
+          zatwierdzi wniosku o ich udostępnienie.
           {analysis.quarantine?.status === "odrzucona" && " Wniosek został odrzucony."}
           {onRefresh && (
             <>
@@ -60,37 +60,39 @@ export function RiskReport({ analysis, fragments, selectedId = null, onSelect, o
         <p className="banner incomplete">Wyniki niepełne — analiza nie dobiegła końca.</p>
       )}
       {!hidden && findings.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Typ</th>
-              <th>Teza</th>
-              <th>Cytat</th>
-              <th>Poziom ryzyka</th>
-              <th>Uzasadnienie</th>
-              <th>Fragment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {findings.map((f) => (
-              <tr
-                key={f.id}
-                aria-selected={f.id === selectedId}
-                className={f.id === selectedId ? "selected" : undefined}
-                onClick={() => onSelect?.(f.id)}
-              >
-                <td>{f.typ}</td>
-                <td>{f.teza}</td>
-                <td className="quote">{f.cytat}</td>
-                <td className={f.poziom_ryzyka ? `risk risk-${f.poziom_ryzyka}` : "risk"}>
-                  {f.poziom_ryzyka ?? "—"}
-                </td>
-                <td>{f.uzasadnienie}</td>
-                <td>{labels.get(f.fragment_id) ?? f.fragment_id}</td>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Typ</th>
+                <th>Teza</th>
+                <th>Cytat</th>
+                <th>Poziom ryzyka</th>
+                <th>Uzasadnienie</th>
+                <th>Fragment</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {findings.map((f) => (
+                <tr
+                  key={f.id}
+                  aria-selected={f.id === selectedId}
+                  className={f.id === selectedId ? "selected" : undefined}
+                  onClick={() => onSelect?.(f.id)}
+                >
+                  <td>{f.typ}</td>
+                  <td>{f.teza}</td>
+                  <td className="quote">{f.cytat}</td>
+                  <td className={f.poziom_ryzyka ? `risk risk-${f.poziom_ryzyka}` : "risk"}>
+                    {f.poziom_ryzyka ? <span className="pill">{f.poziom_ryzyka}</span> : "—"}
+                  </td>
+                  <td>{f.uzasadnienie}</td>
+                  <td>{labels.get(f.fragment_id) ?? f.fragment_id}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {!hidden && findings.length === 0 && analysis.status === "done" && <p>Brak tez.</p>}
     </section>

@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch, errorMessage, postJson } from "../api/client";
-import {
-  FINAL_STATUSES,
-  type AnalysisStarted,
-  type Contract,
-  type PendingAction,
-  type Version,
-} from "../api/types";
+import { FINAL_STATUSES, type AnalysisStarted, type Contract, type PendingAction, type Version } from "../api/types";
 import { DocumentView } from "../document/DocumentView";
 import { RiskReport, STATUS_LABELS, isReportHidden } from "../document/RiskReport";
 import { useAnalysis } from "../document/useAnalysis";
@@ -86,10 +80,12 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
 
   return (
     <section className="contract">
-      <h2>{contract.title}</h2>
-      <p className="meta">
-        Rodzaj: {contract.kind} · Źródło: {contract.source}
-      </p>
+      <div className="page-head">
+        <h2>{contract.title}</h2>
+        <p className="meta">
+          Rodzaj: {contract.kind} · Źródło: {contract.source}
+        </p>
+      </div>
       <nav className="versions" aria-label="Wersje">
         {contract.versions.map((v) => (
           <a
@@ -113,7 +109,7 @@ export function ContractPage({ contractId, versionId, analysisId }: Props) {
         <>
           <div className="toolbar">
             <span data-testid="loaded-version">Wersja {version.nr}</span>
-            <button type="button" onClick={startAnalysis} disabled={busy}>
+            <button type="button" className="primary" onClick={startAnalysis} disabled={busy}>
               Uruchom analizę
             </button>
             {version.analyses.length > 0 && (
@@ -207,7 +203,7 @@ function AnalysisActions({ analysisId }: { analysisId: number }) {
   }
 
   return (
-    <section className="actions" aria-label="Wnioski">
+    <section className="actions card" aria-label="Wnioski">
       <h3>Wnioski</h3>
       <div className="toolbar">
         {USER_ACTIONS.map((a) => (

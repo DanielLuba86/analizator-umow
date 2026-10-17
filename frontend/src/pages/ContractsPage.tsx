@@ -28,38 +28,46 @@ export function ContractsPage() {
 
   return (
     <section className="contracts">
-      <h2>Umowy</h2>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {contracts === null && !error && <p>Ładowanie…</p>}
-      {contracts !== null && contracts.length === 0 && <p>Brak umów.</p>}
-      {contracts !== null && contracts.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Tytuł</th>
-              <th>Rodzaj</th>
-              <th>Źródło</th>
-              <th>Wersje</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contracts.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  <a href={`#/contracts/${c.id}`}>{c.title}</a>
-                </td>
-                <td>{c.kind}</td>
-                <td>{c.source}</td>
-                <td>{c.versions}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <div className="card">
+        <h2>Umowy</h2>
+        {error && (
+          <p role="alert" className="error">
+            {error}
+          </p>
+        )}
+        {contracts === null && !error && <p>Ładowanie…</p>}
+        {contracts !== null && contracts.length === 0 && <p>Brak umów.</p>}
+        {contracts !== null && contracts.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tytuł</th>
+                  <th>Rodzaj</th>
+                  <th>Źródło</th>
+                  <th>Wersje</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contracts.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <a href={`#/contracts/${c.id}`}>{c.title}</a>
+                    </td>
+                    <td>
+                      <span className="pill">{c.kind}</span>
+                    </td>
+                    <td>
+                      <span className="pill pill-muted">{c.source}</span>
+                    </td>
+                    <td>{c.versions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
       <NewContractForm />
     </section>
   );
@@ -100,41 +108,43 @@ function NewContractForm() {
   }
 
   return (
-    <form className="new-contract" onSubmit={onSubmit}>
+    <form className="new-contract card" onSubmit={onSubmit}>
       <h3>Nowa umowa</h3>
-      <label>
-        Tytuł
-        <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} required />
-      </label>
-      <label>
-        Rodzaj
-        <select value={kind} onChange={(e) => setKind(e.target.value as ContractKind)}>
-          {CONTRACT_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Źródło
-        <select value={source} onChange={(e) => setSource(e.target.value as ContractSource)}>
-          {CONTRACT_SOURCES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Plik (.md, .txt)
-        <input type="file" accept=".md,.txt,text/markdown,text/plain" onChange={onFile} />
-      </label>
+      <div className="form-grid">
+        <label>
+          Tytuł
+          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} required />
+        </label>
+        <label>
+          Rodzaj
+          <select value={kind} onChange={(e) => setKind(e.target.value as ContractKind)}>
+            {CONTRACT_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Źródło
+          <select value={source} onChange={(e) => setSource(e.target.value as ContractSource)}>
+            {CONTRACT_SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Plik (.md, .txt)
+          <input type="file" accept=".md,.txt,text/markdown,text/plain" onChange={onFile} />
+        </label>
+      </div>
       <label>
         Tekst umowy
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={10} required />
       </label>
-      <button type="submit" disabled={busy}>
+      <button type="submit" className="primary" disabled={busy}>
         Dodaj umowę
       </button>
       {error && (
