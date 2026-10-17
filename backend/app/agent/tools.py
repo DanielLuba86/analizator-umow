@@ -176,7 +176,7 @@ class AgentTools:
             try:
                 validate_claim(claim)
             except ClaimInvalid as e:
-                self._log("submit_finding", "claim_invalid")
+                self._log("submit_finding", "claim_invalid", reason=e.reason)
                 return _error(f"limit_tez: {_LIMIT_HINT}" if over_limit else e.reason)
             if over_limit:
                 analyses.add_rejected(s, aid, claim, "limit_tez")

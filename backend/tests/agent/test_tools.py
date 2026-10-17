@@ -5,6 +5,7 @@ from typing import Any
 
 import psycopg
 import pytest
+import structlog
 from db_env import QUOTE, TEXT, Env
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -220,6 +221,16 @@ async def test_claim_invalid_is_not_stored(env: Env) -> None:
     assert "poziomu ryzyka" in _text(r1)
     assert env.count_rejected(tools.ctx.analysis_id) == 0
     assert env.count_findings(tools.ctx.analysis_id) == 0
+
+
+async def test_claim_invalid_logs_reason_without_claim_text(env: Env) -> None:
+    tools = env.tools()
+    with structlog.testing.capture_logs() as logs:
+        await tools.submit_finding("ryzyko", "Tajna teza", QUOTE, "f003", "Uzasadnienie.")
+    invalid = [e for e in logs if e.get("outcome") == "claim_invalid"]
+    assert len(invalid) == 1
+    assert invalid[0]["reason"] == "Teza typu ryzyko wymaga poziomu ryzyka."
+    assert "Tajna teza" not in str(invalid[0]) and QUOTE not in str(invalid[0])
 
 
 async def test_finding_limit_enforced(env: Env) -> None:
