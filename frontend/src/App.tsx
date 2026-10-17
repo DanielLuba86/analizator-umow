@@ -25,45 +25,79 @@ function Page({ path, isLawyer }: { path: string; isLawyer: boolean }) {
   return <NotFoundPage />;
 }
 
+function Brand() {
+  return (
+    <a className="brand" href="#/contracts">
+      <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="7" />
+        <text x="16" y="23" textAnchor="middle">
+          §
+        </text>
+      </svg>
+      <h1>Analizator umów</h1>
+    </a>
+  );
+}
+
+function NavLink({ href, current, children }: { href: string; current: boolean; children: string }) {
+  return (
+    <a href={href} aria-current={current ? "page" : undefined}>
+      {children}
+    </a>
+  );
+}
+
 function Shell() {
   const { user, loading, logout } = useAuth();
   const path = useRoute();
+  const isLawyer = user?.role === "prawnik";
 
-  if (loading) return <p>Ładowanie…</p>;
-  if (!user) return <LoginPage />;
-
-  const isLawyer = user.role === "prawnik";
   return (
     <>
       <header className="topbar">
-        <nav aria-label="Główna">
-          <a href="#/contracts">Umowy</a>
-          {isLawyer && <a href="#/approvals">Wnioski do zatwierdzenia</a>}
-        </nav>
-        <span className="user">
-          {user.login} ({user.role})
-          <button
-            type="button"
-            onClick={() => {
-              void logout().finally(() => navigate("/login"));
-            }}
-          >
-            Wyloguj
-          </button>
-        </span>
+        <div className="topbar-inner">
+          <Brand />
+          {user && (
+            <>
+              <nav aria-label="Główna">
+                <NavLink href="#/contracts" current={path !== "/approvals"}>
+                  Umowy
+                </NavLink>
+                {isLawyer && (
+                  <NavLink href="#/approvals" current={path === "/approvals"}>
+                    Wnioski do zatwierdzenia
+                  </NavLink>
+                )}
+              </nav>
+              <span className="user">
+                <span className="user-badge">
+                  {user.login} <span className="user-role">({user.role})</span>
+                </span>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => {
+                    void logout().finally(() => navigate("/login"));
+                  }}
+                >
+                  Wyloguj
+                </button>
+              </span>
+            </>
+          )}
+        </div>
       </header>
-      <Page path={path} isLawyer={isLawyer} />
+      <main className={user ? undefined : "auth"}>
+        {loading ? <p>Ładowanie…</p> : user ? <Page path={path} isLawyer={isLawyer} /> : <LoginPage />}
+      </main>
     </>
   );
 }
 
 export default function App() {
   return (
-    <main>
-      <h1>Analizator umów</h1>
-      <AuthProvider>
-        <Shell />
-      </AuthProvider>
-    </main>
+    <AuthProvider>
+      <Shell />
+    </AuthProvider>
   );
 }

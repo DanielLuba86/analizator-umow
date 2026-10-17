@@ -27,8 +27,9 @@ export function LoginPage() {
   }
 
   return (
-    <section className="login">
+    <section className="login card">
       <h2>Logowanie</h2>
+      <p className="meta">Zaloguj się, aby analizować umowy.</p>
       <form onSubmit={onSubmit}>
         <label>
           Login
@@ -44,7 +45,7 @@ export function LoginPage() {
             required
           />
         </label>
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           Zaloguj
         </button>
       </form>

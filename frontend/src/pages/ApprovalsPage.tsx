@@ -51,7 +51,7 @@ export function ApprovalsPage() {
   }
 
   return (
-    <section className="approvals">
+    <section className="approvals card">
       <h2>Wnioski do zatwierdzenia</h2>
       {error && (
         <p role="alert" className="error">
@@ -61,22 +61,24 @@ export function ApprovalsPage() {
       {actions === null && !error && <p>Ładowanie…</p>}
       {actions !== null && actions.length === 0 && <p>Brak oczekujących wniosków.</p>}
       {actions !== null && actions.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Nr</th>
-              <th>Typ</th>
-              <th>Analiza</th>
-              <th>Szczegóły</th>
-              <th>Decyzja</th>
-            </tr>
-          </thead>
-          <tbody>
-            {actions.map((a) => (
-              <ActionRow key={a.id} action={a} onDecide={(body) => decide(a.id, body)} />
-            ))}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nr</th>
+                <th>Typ</th>
+                <th>Analiza</th>
+                <th>Szczegóły</th>
+                <th>Decyzja</th>
+              </tr>
+            </thead>
+            <tbody>
+              {actions.map((a) => (
+                <ActionRow key={a.id} action={a} onDecide={(body) => decide(a.id, body)} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );
@@ -98,7 +100,9 @@ function ActionRow({ action, onDecide }: { action: PendingAction; onDecide: (bod
   return (
     <tr>
       <td>#{action.id}</td>
-      <td>{action.typ}</td>
+      <td>
+        <span className="pill">{action.typ}</span>
+      </td>
       <td>
         <a href={`#/analyses/${action.analysis_id}`}>Analiza #{action.analysis_id}</a>
       </td>
@@ -118,10 +122,15 @@ function ActionRow({ action, onDecide }: { action: PendingAction; onDecide: (bod
         )}
       </td>
       <td className="decision">
-        <button type="button" disabled={busy || (isTemplate && !templateReady)} onClick={() => run(true)}>
+        <button
+          type="button"
+          className="primary"
+          disabled={busy || (isTemplate && !templateReady)}
+          onClick={() => run(true)}
+        >
           Zatwierdź
         </button>
-        <button type="button" disabled={busy} onClick={() => run(false)}>
+        <button type="button" className="danger" disabled={busy} onClick={() => run(false)}>
           Odrzuć
         </button>
       </td>

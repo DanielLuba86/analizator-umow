@@ -56,7 +56,7 @@ export function ComparePage({ contractId }: { contractId: number }) {
   );
 
   return (
-    <section className="compare">
+    <section className="compare card">
       <h2>Porównanie wersji: {contract.title}</h2>
       <p>
         <a href={`#/contracts/${contract.id}`}>← Wróć do umowy</a>
@@ -64,7 +64,7 @@ export function ComparePage({ contractId }: { contractId: number }) {
       <form className="toolbar" onSubmit={onSubmit}>
         {versionSelect("Stara wersja", oldId, setOldId)}
         {versionSelect("Nowa wersja", newId, setNewId)}
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           Porównaj
         </button>
       </form>
