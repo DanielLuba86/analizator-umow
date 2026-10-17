@@ -174,7 +174,8 @@ docker compose run --rm -v "$PWD/scripts:/scripts:ro" -v "$PWD/data:/data:ro" \
 - **Spotlighting.** Agent czyta umowę wyłącznie przez narzędzie, w znacznikach
   `<untrusted_contract_fragment>`, a prompt deklaruje ich zawartość jako dane.
 - **Najmniejsze uprawnienia.** Agent ma tylko 5 własnych narzędzi (odczyt jednej umowy, wzorce,
-  zgłaszanie tez, wnioski). Nie ma powłoki, plików ani sieci.
+  zgłaszanie tez, wnioski). Nie ma powłoki, plików ani sieci. Szczegóły:
+  [narzędzia agenta i ich uprawnienia](docs/narzedzia-agenta.md).
 - **Cytaty weryfikowane kodem.** Teza bez dosłownego cytatu jest odrzucana i nie trafia do raportu.
 - **Człowiek w pętli.** Oficjalna opinia, zmiana wzorca, eksport i zwolnienie z kwarantanny
   wymagają zatwierdzenia przez prawnika. Każda decyzja trafia do dziennika audytu.
@@ -194,7 +195,9 @@ Szczegóły: [model zagrożeń](docs/threat-model.md).
 ## Dokumentacja
 
 - [Architektura (arc42)](docs/arc42/README.md) — 12 sekcji z diagramami C4 i sekwencji.
-- [Decyzje architektoniczne (ADR)](docs/adr/README.md) — 0001–0008.
+- [Decyzje architektoniczne (ADR)](docs/adr/README.md) — 0001–0010.
+- [Narzędzia agenta i ich uprawnienia](docs/narzedzia-agenta.md) — pięć narzędzi, konfiguracja
+  SDK, limity, kto wykonuje skutki.
 - [Model zagrożeń](docs/threat-model.md) — STRIDE i OWASP Top 10 for LLM, każde zagrożenie
   z obroną i testem.
 - [Specyfikacja](docs/superpowers/specs/2026-10-15-analizator-umow-design.md) i

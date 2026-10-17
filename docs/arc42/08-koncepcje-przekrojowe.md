@@ -4,7 +4,8 @@
 
 Treść umowy kontrahenta to dane nieufne. Obrona jest warstwowa, więc żadna pojedyncza warstwa nie
 musi być doskonała. Szczegółowe zagrożenia, obrony i testy są w
-[modelu zagrożeń](../threat-model.md).
+[modelu zagrożeń](../threat-model.md), a każde narzędzie agenta z jego uprawnieniami opisuje
+[dokument o narzędziach agenta](../narzedzia-agenta.md).
 
 | Warstwa | Mechanizm | Kod |
 |---|---|---|
