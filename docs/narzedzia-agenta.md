@@ -135,13 +135,22 @@ docker compose run --rm -v "$PWD/data:/data:ro" backend \
 
 | Zmienna | Domyślnie | Co ogranicza |
 |---|---|---|
-| `AGENT_MAX_TURNS` | 30 | `max_turns` przebiegu SDK; przekroczenie → `budget_exceeded` |
+| `AGENT_MAX_TURNS` | 30 | liczba odpowiedzi modelu w przebiegu (`max_turns` SDK); przekroczenie → `budget_exceeded` |
 | `AGENT_MAX_BUDGET_USD` | 0.50 | koszt jednego przebiegu; przekroczenie → `budget_exceeded` |
 | `AGENT_TIMEOUT_S` | 300 | czas przebiegu; przekroczenie → `budget_exceeded` |
 | `AGENT_MAX_FINDINGS` | 60 | liczba tez w analizie (`limit_tez`) |
 | `AGENT_MAX_RETRIES` | 10 | ponowienia wywołań API przez CLI (`CLAUDE_CODE_MAX_RETRIES`) |
 | `MAX_ACTIVE_ANALYSES` | 5 | analizy `queued`/`running` naraz w całej aplikacji (429) |
 | `MAX_ACTIVE_ANALYSES_PER_USER` | 2 | analizy `queued`/`running` naraz jednej osoby (429) |
+
+**Tura to jedna odpowiedź modelu**, a nie jedno wywołanie narzędzia. Model może w jednej
+odpowiedzi wywołać kilka narzędzi naraz, więc liczba wywołań narzędzi jest zwykle kilka razy
+większa niż liczba tur. Pomiar z 2026-10-17 na `umowa_zlecenia.md`: 9 tur i 55 wywołań narzędzi.
+Liczbę wywołań ogranicza w praktyce budżet, czas i limit tez, a nie `AGENT_MAX_TURNS`.
+
+Runner zapisuje w `analyses.turns` i w logu `agent_run` liczbę tur w tej samej jednostce co
+limit: liczbę różnych odpowiedzi modelu (`message_id`). Nie używa `num_turns` z wyniku CLI, bo
+przy udanym przebiegu ta wartość jest bliska liczbie wywołań narzędzi.
 
 Wartości ustawia się w `.env` ([`.env.example`](../.env.example)).
 
