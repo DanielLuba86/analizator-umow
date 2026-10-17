@@ -88,6 +88,10 @@ def _result(subtype: str, *, is_error: bool = False, cost: float | None = 0.12) 
     )
 
 
+def _assistant(message_id: str) -> AssistantMessage:
+    return AssistantMessage(content=[TextBlock("x")], model="m", message_id=message_id)
+
+
 def _init(tools: list[str]) -> SystemMessage:
     return SystemMessage(subtype="init", data={"type": "system", "subtype": "init", "tools": tools})
 
@@ -179,12 +183,13 @@ def test_start_prompt_has_kind_and_no_contract_text() -> None:
 def test_result_subtype_mapping(
     subtype: str, is_error: bool, status: str, reason: str | None
 ) -> None:
-    out = outcome_from_result(_result(subtype, is_error=is_error))
-    assert (out.status, out.reason, out.turns, out.cost_usd) == (status, reason, 4, 0.12)
+    out = outcome_from_result(_result(subtype, is_error=is_error), turns=3)
+    # Liczba tur pochodzi z runnera (odpowiedzi modelu), nie z num_turns CLI (4).
+    assert (out.status, out.reason, out.turns, out.cost_usd) == (status, reason, 3, 0.12)
 
 
 def test_result_without_cost_is_zero() -> None:
-    assert outcome_from_result(_result("success", cost=None)).cost_usd == 0
+    assert outcome_from_result(_result("success", cost=None), turns=0).cost_usd == 0
 
 
 def test_check_init_tools_accepts_exactly_five() -> None:
@@ -290,10 +295,24 @@ async def test_run_success_passes_prompt_and_maps_result() -> None:
     msgs: list[Message] = [_init(ALLOWED_TOOLS), _result("error_max_budget_usd", is_error=True)]
     runner = SdkAgentRunner(_settings(), query_fn=fake_query(msgs, seen))
     out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
-    assert (out.status, out.reason, out.turns) == ("budget_exceeded", "budget", 4)
+    assert (out.status, out.reason, out.turns) == ("budget_exceeded", "budget", 0)
     assert seen["prompt"] == start_prompt(CTX)
     assert seen["options"].allowed_tools == ALLOWED_TOOLS
     assert not Path(seen["options"].cwd).exists()  # katalog roboczy sprzątnięty po run
+
+
+async def test_turns_count_distinct_model_responses_not_cli_num_turns() -> None:
+    # CLI wysyła każdy blok tool_use jako osobny AssistantMessage z tym samym message_id;
+    # limit max_turns liczy odpowiedzi modelu, a num_turns przy sukcesie liczy co innego.
+    msgs: list[Message] = [
+        _init(ALLOWED_TOOLS),
+        *[_assistant("msg_a") for _ in range(3)],
+        *[_assistant("msg_b") for _ in range(2)],
+        _result("success"),
+    ]
+    runner = SdkAgentRunner(_settings(), query_fn=fake_query(msgs, {}))
+    out = await runner.run(CTX, RecordingTools())  # type: ignore[arg-type]
+    assert (out.status, out.turns) == ("done", 2)
 
 
 async def test_run_without_result_is_failed() -> None:

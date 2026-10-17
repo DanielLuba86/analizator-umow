@@ -242,8 +242,9 @@ def start_prompt(ctx: AnalysisContext) -> str:
     return f"Przeanalizuj umowę rodzaju {ctx.kind}. Zacznij od list_fragments."
 
 
-def outcome_from_result(msg: ResultMessage) -> RunOutcome:
-    turns, cost = msg.num_turns, msg.total_cost_usd or 0.0
+def outcome_from_result(msg: ResultMessage, *, turns: int) -> RunOutcome:
+    """`turns` liczy runner; `num_turns` z CLI przy sukcesie nie jest jednostką `max_turns`."""
+    cost = msg.total_cost_usd or 0.0
     status: Literal["done", "budget_exceeded", "failed"]
     if msg.subtype == "success" and not msg.is_error:
         status, reason = "done", None
@@ -271,6 +272,19 @@ class SdkAgentRunner:
         self._timeout_s = settings.agent_timeout_s if timeout_s is None else timeout_s
         self.init_tools: list[str] | None = None
         self._turns = 0
+        self._response_ids: set[str] = set()
+
+    def _count_turn(self, msg: AssistantMessage) -> None:
+        """Tura to jedna odpowiedź modelu, jak w limicie `max_turns` CLI.
+
+        CLI wysyła każdy blok odpowiedzi (np. równoległe tool_use) jako osobny komunikat
+        z tym samym `message_id`; komunikat bez identyfikatora liczy się osobno.
+        """
+        if msg.message_id is None:
+            self._turns += 1
+        elif msg.message_id not in self._response_ids:
+            self._response_ids.add(msg.message_id)
+            self._turns += 1
 
     async def _consume(
         self, ctx: AnalysisContext, options: ClaudeAgentOptions, opened: list[bool]
@@ -289,9 +303,9 @@ class SdkAgentRunner:
                     check_init_tools(tools)
                     opened[0] = True
                 elif isinstance(msg, AssistantMessage):
-                    self._turns += 1
+                    self._count_turn(msg)
                 elif isinstance(msg, ResultMessage):
-                    return outcome_from_result(msg)
+                    return outcome_from_result(msg, turns=self._turns)
         return RunOutcome("failed", self._turns, 0.0, "brak_wyniku")
 
     async def run(self, ctx: AnalysisContext, tools: AgentTools) -> RunOutcome:
@@ -303,6 +317,7 @@ class SdkAgentRunner:
             return out
         opened = [False]
         self._turns = 0
+        self._response_ids = set()
         server = build_mcp_server(tools, gate=lambda: opened[0])
         options = build_options(self._settings, server)
         # Koszt podaje tylko ResultMessage; przy przerwaniu znamy wyłącznie liczbę tur.

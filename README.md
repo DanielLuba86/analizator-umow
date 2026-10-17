@@ -183,7 +183,8 @@ docker compose run --rm -v "$PWD/scripts:/scripts:ro" -v "$PWD/data:/data:ro" \
   kancelarii (`REPORT_FIRM_NAME`), a raport, który nie jest oficjalną opinią, dostaje baner
   „WERSJA ROBOCZA – dokument nie stanowi opinii prawnej”. Tezy i cytaty trafiają do PDF jako
   zwykły tekst.
-- **Limity.** Liczba kroków, budżet, czas i liczba tez na analizę są konfigurowane w `.env`.
+- **Limity.** Liczba tur (odpowiedzi modelu), budżet, czas i liczba tez na analizę są
+  konfigurowane w `.env`.
 - **Brak wycieku.**
   - Treść umów nie trafia do logów ani komunikatów błędów.
   - Frontend wyświetla tekst wyłącznie jako tekst; obowiązuje nagłówek CSP.
